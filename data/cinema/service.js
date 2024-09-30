@@ -27,3 +27,5 @@ function cinemaService(cinemaModel) {
         })
     }
 }
+
+module.exports = cinemaService;

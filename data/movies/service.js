@@ -30,4 +30,6 @@ function MovieService() {
     }
     
     return service;
-    }
+}
+
+module.exports = MovieService;
