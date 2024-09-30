@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
 
-function UserService(userModel) {
+function UserService(UserModel) {
   let service = {
     create,
     findAll,
@@ -130,7 +130,7 @@ function UserService(userModel) {
       { id: user._id, name: user.name, role: user.role.scopes },
       config.secret,
       {
-        expiresIn: config.expirePassword,
+        expiresIn: config.expiresPassword,
       }
     );
     return { auth: true, token };

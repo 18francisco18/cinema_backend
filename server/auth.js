@@ -59,6 +59,29 @@ const AuthRouter = () => {
       });
   });
 
+  router.route("/me").get(VerifyToken, function (req, res, next) {
+    const token = req.cookies.token || req.headers["authorization"];
+    jwt.verify(token, config.secret, function (err, decoded) {
+      if (err) {
+        return res
+          .status(500)
+          .send({ auth: false, message: "Failed to authenticate token." });
+      }
+      res.status(200).send(decoded);
+    });
+  });
+
+  router.route("/user/:id").get(VerifyToken, function (req, res, next) {
+    const userId = req.params.id;
+    findById(userId)
+      .then((user) => {
+        res.status(200).send(user);
+      })
+      .catch((err) => {
+        res.status(404).send({ error: err });
+      });
+  });
+
   router.use(cookieParser());
   router.use(VerifyToken);
 

@@ -4,7 +4,7 @@ const express = require("express");
 function init() {
   let api = express();
 
-  api.get("/auth", AuthAPI());
+  api.use("/auth", AuthAPI());
 
   return api;
 }

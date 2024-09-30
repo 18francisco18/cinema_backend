@@ -9,11 +9,12 @@ const port = 3000;
 
 mongoose
   .connect(config.db)
-  .then(() => console.log("Conection successful!"))
+  .then(() => console.log("Connection successful!"))
   .catch((err) => console.error(err));
 
 let router = require("./router");
 var app = express();
+app.use(express.json()); 
 app.use(router.init());
 
 const server = http.Server(app);
