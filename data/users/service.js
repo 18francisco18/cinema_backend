@@ -1,4 +1,3 @@
-const { compare } = require("bcrypt");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
@@ -32,15 +31,13 @@ function UserService(userModel) {
     });
   }
 
-  function findAll() {
-    return userModel
-      .find({})
-      .then((users) => {
-        return users;
-      })
-      .catch((err) => {
-        return Promise.reject("Error fetching users");
-      });
+  function save(model) {
+    return new Promise(function (resolve, reject) {
+      model
+        .save()
+        .then(() => resolve("User created"))
+        .catch((err) => reject(`There is a problem with register ${err}`));
+    });
   }
 
   function findById(id) {
@@ -57,13 +54,15 @@ function UserService(userModel) {
       });
   }
 
-  function save(model) {
-    return new Promise(function (resolve, reject) {
-      model
-        .save()
-        .then(() => resolve("User created"))
-        .catch((err) => reject(`There is a problem with register ${err}`));
-    });
+  function findAll() {
+    return userModel
+      .find({})
+      .then((users) => {
+        return users;
+      })
+      .catch((err) => {
+        return Promise.reject("Error fetching users");
+      });
   }
 
   function findUser(model, body) {
