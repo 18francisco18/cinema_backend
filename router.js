@@ -1,14 +1,14 @@
-let UsersAPI = require('./server/users');
-const express = require('express');
+let AuthAPI = require("./server/auth");
+const express = require("express");
 
-function init (){
-    let api = express();
+function init() {
+  let api = express();
 
-    api.get('/users', UsersAPI());
+  api.get("/auth", AuthAPI());
 
-    return api;
+  return api;
 }
 
 module.exports = {
-    init: init
-}
+  init: init,
+};

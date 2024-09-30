@@ -1,6 +1,7 @@
+const { compare } = require("bcrypt");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
+const config = require("../../config");
 
 function UserService(userModel) {
   let service = {
@@ -9,21 +10,153 @@ function UserService(userModel) {
     findById,
     findUser,
     removeById,
-    update,
-    changePassword,
-    forgotPassword,
-    resetPassword,
+    updateUser,
+    createPassword,
+    comparePassword,
     verifyToken,
     createToken,
-    deleteUser,
+    deleteUserById,
   };
 
-    async function create(user) {
-        let newUser = new userModel(user);
-        return newUser.save();
-    }
+  function create(user) {
+    return createPassword(user).then((hashPassword, err) => {
+      if (err) {
+        return Promise.reject("Not Saved");
+      }
+      let newUserWithPassword = {
+        ...user,
+        password: hashPassword,
+      };
+      let newUser = new UserModel(newUserWithPassword);
+      return save(newUser);
+    });
+  }
 
+  function findAll() {
+    return userModel
+      .find({})
+      .then((users) => {
+        return users;
+      })
+      .catch((err) => {
+        return Promise.reject("Error fetching users");
+      });
+  }
+
+  function findById(id) {
+    return userModel
+      .findById(id)
+      .then((user) => {
+        if (!user) {
+          return Promise.reject("User not found");
+        }
+        return user;
+      })
+      .catch((err) => {
+        return Promise.reject("Error fetching user");
+      });
+  }
+
+  function save(model) {
+    return new Promise(function (resolve, reject) {
+      model
+        .save()
+        .then(() => resolve("User created"))
+        .catch((err) => reject(`There is a problem with register ${err}`));
+    });
+  }
+
+  function findUser(model, body) {
+    return model.findOne({ email: body.email }).then(function (user) {
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      return bcrypt
+        .compare(body.password, user.password)
+        .then(function (match) {
+          if (!match) {
+            throw new Error("Invalid password");
+          }
+
+          return user;
+        });
+    });
+  }
+
+  function removeById(id) {
+    return userModel
+      .findByIdAndRemove(id)
+      .then((user) => {
+        if (!user) {
+          return Promise.reject("User not found");
+        }
+        return "User successfully removed";
+      })
+      .catch((err) => {
+        return Promise.reject("Error removing user");
+      });
+  }
+
+  function updateUser(id, updateData) {
+    return userModel
+      .findByIdAndUpdate(id, updateData, { new: true })
+      .then((user) => {
+        if (!user) {
+          return Promise.reject("User not found");
+        }
+        return user;
+      })
+      .catch((err) => {
+        return Promise.reject("Error updating user");
+      });
+  }
+
+  function deleteUserById(id) {
+    return userModel
+      .findByIdAndDelete(id)
+      .then((user) => {
+        if (!user) {
+          return Promise.reject("User not found");
+        }
+        return "User successfully deleted";
+      })
+      .catch((err) => {
+        return Promise.reject("Error deleting user");
+      });
+  }
+
+  function createToken(user) {
+    let token = jwt.sign(
+      { id: user._id, name: user.name, role: user.role.scopes },
+      config.secret,
+      {
+        expiresIn: config.expirePassword,
+      }
+    );
+    return { auth: true, token };
+  }
+
+  function verifyToken(token) {
+    return new Promise(function (resolve, reject) {
+      jwt.verify(token, config.secret, function (err, decoded) {
+        if (err) {
+          reject();
+        }
+        return resolve(decoded);
+      });
+    });
+  }
+
+  function createPassword(user) {
+    return bcrypt.hash(user.password, config.saltRounds);
+  }
+
+  function comparePassword(password, hash) {
+    return bcrypt.compare(password, hash);
+  }
+
+  return service;
 }
-
 
 module.exports = UserService;
