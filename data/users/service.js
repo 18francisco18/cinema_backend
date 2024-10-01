@@ -41,7 +41,7 @@ function UserService(UserModel) {
   }
 
   function findById(id) {
-    return userModel
+    return UserModel
       .findById(id)
       .then((user) => {
         if (!user) {
@@ -55,7 +55,7 @@ function UserService(UserModel) {
   }
 
   function findAll() {
-    return userModel
+    return UserModel
       .find({})
       .then((users) => {
         return users;
@@ -84,7 +84,7 @@ function UserService(UserModel) {
   }
 
   function removeById(id) {
-    return userModel
+    return UserModel
       .findByIdAndRemove(id)
       .then((user) => {
         if (!user) {
@@ -98,7 +98,7 @@ function UserService(UserModel) {
   }
 
   function updateUser(id, updateData) {
-    return userModel
+    return UserModel
       .findByIdAndUpdate(id, updateData, { new: true })
       .then((user) => {
         if (!user) {
@@ -112,7 +112,7 @@ function UserService(UserModel) {
   }
 
   function deleteUserById(id) {
-    return userModel
+    return UserModel
       .findByIdAndDelete(id)
       .then((user) => {
         if (!user) {

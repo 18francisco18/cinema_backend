@@ -1,7 +1,9 @@
-let UsersAPI = require('./server/users');
+let UsersAPI = require('./server/auth');
 let MoviesAPI = require('./server/movies');
 const express = require('express');
 let AuthAPI = require("./server/auth");
+let CinemaAPI = require("./server/cinema");
+let RoomsAPI = require("./server/rooms");
 
 
 function init() {
@@ -10,6 +12,8 @@ function init() {
     api.use('/users', UsersAPI());
     api.use('/movies', MoviesAPI());
     api.use("/auth", AuthAPI());
+    api.use("/cinemas", CinemaAPI());
+    api.use("/rooms", RoomsAPI());
 
   return api;
 }
