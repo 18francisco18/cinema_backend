@@ -4,7 +4,7 @@ const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
 function MovieService(movieModel) {
   let service = {
     create,
-    getMovieByTitleAndYear,
+    getMovieByTitleYearAndPlot,
   };
 
   function create(movie) {
@@ -13,8 +13,8 @@ function MovieService(movieModel) {
   }
 
   // Função para buscar um filme pelo título e ano na API OMDb
-  async function getMovieByTitleAndYear(title, year) {
-    console.log("chamei a fnçao getMovieByTitleAndYear");
+  async function getMovieByTitleYearAndPlot(title, year, plot) {
+    console.log("chamei a funçao getMovieByTitleYearAndPlot");
 
     try {
       // Busca o filme na API OMDb através do título e ano, cujos titulos e anos são passados
@@ -25,6 +25,8 @@ function MovieService(movieModel) {
         params: {
           t: title, // Título do filme
           y: year, // Ano do filme (opcional)
+          //plot ter valores: short, full
+          plot: plot, // Tipo de plot
           apikey: MOVIE_API_KEY, // Chave da API
         },
       });

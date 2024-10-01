@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
+const { response } = require("express");
 
 function UserService(UserModel) {
   let service = {
@@ -14,7 +15,6 @@ function UserService(UserModel) {
     comparePassword,
     verifyToken,
     createToken,
-    deleteUserById,
   };
 
   function create(user) {
@@ -85,7 +85,7 @@ function UserService(UserModel) {
 
   function removeById(id) {
     return UserModel
-      .findByIdAndRemove(id)
+      .findByIdAndDelete(id)
       .then((user) => {
         if (!user) {
           return Promise.reject("User not found");
@@ -108,20 +108,6 @@ function UserService(UserModel) {
       })
       .catch((err) => {
         return Promise.reject("Error updating user");
-      });
-  }
-
-  function deleteUserById(id) {
-    return UserModel
-      .findByIdAndDelete(id)
-      .then((user) => {
-        if (!user) {
-          return Promise.reject("User not found");
-        }
-        return "User successfully deleted";
-      })
-      .catch((err) => {
-        return Promise.reject("Error deleting user");
       });
   }
 

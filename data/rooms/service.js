@@ -1,4 +1,4 @@
-const CinemaModel = require('../cinema/cinema');
+const CinemaModel = require('../cinema');
 
 function RoomService(roomModel) {
     let service = {
