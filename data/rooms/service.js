@@ -12,6 +12,7 @@ function RoomService(roomModel) {
 
             await CinemaModel.findByIdAndUpdate(
                 room.cinema,
+                // empurra o id da nova sala sala para o array de salas do cinema
                 { $push: { rooms: savedRoom._id } }
             );
             

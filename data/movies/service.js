@@ -78,9 +78,6 @@ function MovieService(movieModel) {
         response: movieData.Response || "N/A",
       };
 
-      // Salvar o filme já modificado no banco de dados.
-      await movieModel.create(completeMovieData);
-
       // Retorna os dados completos do filme
       return completeMovieData;
     } catch (error) {
