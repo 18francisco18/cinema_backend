@@ -1,5 +1,5 @@
-const MovieService = require("../movies"); // O serviço que lida com a requisição à OMDb API
-const movieModel = require("./movies"); 
+const movieService = require("../movies"); // O serviço que lida com a requisição à OMDb API
+const movieModel = require("./movies"); // O modelo de filme
 
 const movieController = {
   searchMovie,  
@@ -16,7 +16,7 @@ async function searchMovie(req, res) {
 
   try {
     // Chama o serviço que faz a requisição à OMDb API
-    const movie = await MovieService.getMovieByTitleAndYear(title, year);
+    const movie = await movieService.getMovieByTitleAndYear(title, year);
 
     // Verifica se o filme já está no banco de dados
     // ATENCAO- A API AINDA É USADA MESMO QUE VÁ BUSCAR AO BANCO DE DADOS. PARA CORRIGIR, COLOCAR
