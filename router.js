@@ -1,10 +1,12 @@
 let UsersAPI = require('./server/users');
+let MoviesAPI = require('./server/movies');
 const express = require('express');
 
 function init (){
     let api = express();
 
-    api.get('/users', UsersAPI());
+    api.use('/users', UsersAPI());
+    api.use('/movies', MoviesAPI());
 
     return api;
 }
