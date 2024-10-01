@@ -5,9 +5,7 @@ function cinemaService(cinemaModel) {
         create,
         save,
         findAll
-    }
-
-
+    };
 
     function create(cinema) {
         let newCinema = new cinemaModel(cinema)
@@ -26,6 +24,21 @@ function cinemaService(cinemaModel) {
             })
         })
     }
+
+    function findAll() {
+        return new Promise((resolve, reject) => {
+            cinemaModel
+            .find({}, (err, cinemas) => {
+                if (err) {
+                    reject(err)
+                } else {
+                    resolve(cinemas)
+                }
+            })
+        })
+    }
+
+    return service;
 }
 
 module.exports = cinemaService;
