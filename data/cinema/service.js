@@ -10,10 +10,10 @@ function cinemaService(cinemaModel) {
   async function create(cinema) {
     try {
       let newCinema = new cinemaModel(cinema);
-      return await newCinema.save();
+      return await save(newCinema);
     } catch (error) {
-        console.log(error);
-        throw new Error(`Erro ao criar cinema: ${error.message}`);
+      console.log(error);
+      throw new Error(`Erro ao criar cinema: ${error.message}`);
     }
   }
 
@@ -26,13 +26,12 @@ function cinemaService(cinemaModel) {
     });
   }
 
-  async function findAll () {
+  async function findAll() {
     try {
-        return await cinemaModel.find({});
-    }
-    catch (error) {
-        console.log(error);
-        throw new Error(`Erro ao buscar cinemas: ${error.message}`);
+      return await cinemaModel.find({});
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Erro ao buscar cinemas: ${error.message}`);
     }
   }
 
@@ -48,13 +47,12 @@ function cinemaService(cinemaModel) {
   async function findByIdAndUpdate(id, cinema) {
     try {
       return await cinemaModel.findByIdAndUpdate(id, cinema, { new: true });
-    }
-    catch (error) {
+    } catch (error) {
       console.log(error);
       throw new Error(`Erro ao atualizar cinema: ${error.message}`);
     }
   }
-  
+
   function removeById(id) {
     return cinemaModel
       .findByIdAndRemove(id)
@@ -86,11 +84,7 @@ function cinemaService(cinemaModel) {
 
   function fillRoom(id, room) {
     return cinemaModel
-      .findByIdAndUpdate(
-        id,
-        { $push: { rooms: room } },
-        { new: true }
-      )
+      .findByIdAndUpdate(id, { $push: { rooms: room } }, { new: true })
       .then((cinema) => {
         if (!cinema) {
           return Promise.reject("Cinema não encontrado");
@@ -104,11 +98,7 @@ function cinemaService(cinemaModel) {
 
   function removeRoom(id, room) {
     return cinemaModel
-      .findByIdAndUpdate(
-        id,
-        { $pull: { rooms: room } },
-        { new: true }
-      )
+      .findByIdAndUpdate(id, { $pull: { rooms: room } }, { new: true })
       .then((cinema) => {
         if (!cinema) {
           return Promise.reject("Cinema não encontrado");
