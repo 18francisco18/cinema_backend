@@ -2,6 +2,8 @@ const axios = require("axios");
 const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
 const { Movie } = require("../movies");
 
+
+
 const getMovies = async () => {
     const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
         params: {
