@@ -5,6 +5,11 @@ function cinemaService(cinemaModel) {
     findAll,
     findById,
     findByIdAndUpdate,
+    removeById,
+    findRoomById,
+    fillRoom,
+    removeRoom,
+    occupyRoom,
   };
 
   async function create(cinema) {

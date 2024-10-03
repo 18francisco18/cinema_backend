@@ -3,6 +3,10 @@ const CinemaModel = require('../cinema');
 function RoomService(roomModel) {
     let service = {
         create,
+        findById,
+        findAll,
+        removeById,
+        updateById,
     };
 
     async function create(room) {
@@ -24,7 +28,60 @@ function RoomService(roomModel) {
         }
     }
 
-    return service
+    function findById(id) {
+        return roomModel
+            .findById(id)
+            .then((room) => {
+                if (!room) {
+                    return Promise.reject("Room not found");
+                }
+                return room;
+            })
+            .catch((err) => {
+                return Promise.reject("Error fetching room");
+            });
+    }
+
+    function findAll() {
+        return roomModel
+            .find({})
+            .then((rooms) => {
+                return rooms;
+            })
+            .catch((err) => {
+                return Promise.reject("Error fetching rooms");
+            });
+    }
+
+    function removeById(id) {
+        return roomModel
+            .findByIdAndRemove(id)
+            .then((room) => {
+                if (!room) {
+                    return Promise.reject("Room not found");
+                }
+                return room;
+            })
+            .catch((err) => {
+                return Promise.reject("Error removing room");
+            });
+    }
+
+    function updateById(id, room) {
+        return roomModel
+            .findByIdAndUpdate(id, room, { new: true })
+            .then((room) => {
+                if (!room) {
+                    return Promise.reject("Room not found");
+                }
+                return room;
+            })
+            .catch((err) => {
+                return Promise.reject("Error updating room");
+            });
+    }
+
+    return service;
 }
 
 module.exports = RoomService;
