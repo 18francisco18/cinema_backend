@@ -1,114 +1,127 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
-const { response } = require("express");
 
 function UserService(UserModel) {
   let service = {
-    create,
-    findAll,
-    findById,
-    findUser,
-    removeById,
-    updateUser,
-    createPassword,
-    comparePassword,
-    verifyToken,
-    createToken,
+    create,   //feito
+    findAll,  //feito
+    findById, //feito
+    findUser,  //feito
+    removeById,  //feito
+    updateUser,  //feito
+    createPassword,  //feito
+    comparePassword,  //feito
+    verifyToken,  //feito
+    createToken,   //feito
   };
 
-  function create(user) {
-    return createPassword(user).then((hashPassword, err) => {
-      if (err) {
-        return Promise.reject("Not Saved");
-      }
+  // Converte para async
+  async function create(user) {
+    try {
+      const hashPassword = await createPassword(user);
       let newUserWithPassword = {
         ...user,
         password: hashPassword,
       };
       let newUser = new UserModel(newUserWithPassword);
-      return save(newUser);
-    });
+      return await save(newUser);
+    } catch (err) {
+      return Promise.reject("Not Saved");
+    }
   }
 
-  function save(model) {
-    return new Promise(function (resolve, reject) {
-      model
-        .save()
-        .then(() => resolve("User created"))
-        .catch((err) => reject(`There is a problem with register ${err}`));
-    });
+  // Converte para async
+  async function save(model) {
+    try {
+      await model.save();
+      return "User created";
+    } catch (err) {
+      return Promise.reject(`There is a problem with register ${err}`);
+    }
   }
 
-  function findById(id) {
-    return UserModel
-      .findById(id)
-      .then((user) => {
-        if (!user) {
-          return Promise.reject("User not found");
-        }
-        return user;
-      })
-      .catch((err) => {
-        return Promise.reject("Error fetching user");
-      });
+  // Converte para async
+  async function findById(id) {
+    try {
+      const user = await UserModel.findById(id);
+      if (!user) {
+        return Promise.reject("User not found");
+      }
+      return user;
+    } catch (err) {
+      return Promise.reject("Error fetching user");
+    }
   }
 
-  function findAll() {
-    return UserModel
-      .find({})
-      .then((users) => {
-        return users;
-      })
-      .catch((err) => {
-        return Promise.reject("Error fetching users");
-      });
+  // Converte para async
+  async function findAll() {
+    try {
+      const users = await UserModel.find({});
+      return users;
+    } catch (err) {
+      return Promise.reject("Error fetching users");
+    }
   }
 
-  function findUser(model, body) {
-    return model.findOne({ email: body.email }).then(function (user) {
+  // Converte para async
+  async function findUser(model, body) {
+    try {
+      const user = await model.findOne({ email: body.email });
       if (!user) {
         throw new Error("User not found");
       }
 
-      return bcrypt
-        .compare(body.password, user.password)
-        .then(function (match) {
-          if (!match) {
-            throw new Error("Invalid password");
-          }
+      const match = await bcrypt.compare(body.password, user.password);
+      if (!match) {
+        throw new Error("Invalid password");
+      }
 
-          return user;
+      return user;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  // Converte para async
+  async function removeById(id) {
+    try {
+      const user = await UserModel.findByIdAndDelete(id);
+      if (!user) {
+        return Promise.reject("User not found");
+      }
+      return "User successfully removed";
+    } catch (err) {
+      return Promise.reject("Error removing user");
+    }
+  }
+
+  // Converte para async
+  async function updateUser(id, updateData) {
+    try {
+      const user = await UserModel.findByIdAndUpdate(id, updateData, { new: true });
+      if (!user) {
+        return Promise.reject("User not found");
+      }
+      return user;
+    } catch (err) {
+      return Promise.reject("Error updating user");
+    }
+  }
+
+  // Converte para async
+  async function verifyToken(token) {
+    try {
+      const decoded = await new Promise((resolve, reject) => {
+        jwt.verify(token, config.secret, (err, decoded) => {
+          if (err) reject(err);
+          resolve(decoded);
         });
-    });
-  }
-
-  function removeById(id) {
-    return UserModel
-      .findByIdAndDelete(id)
-      .then((user) => {
-        if (!user) {
-          return Promise.reject("User not found");
-        }
-        return "User successfully removed";
-      })
-      .catch((err) => {
-        return Promise.reject("Error removing user");
       });
-  }
-
-  function updateUser(id, updateData) {
-    return UserModel
-      .findByIdAndUpdate(id, updateData, { new: true })
-      .then((user) => {
-        if (!user) {
-          return Promise.reject("User not found");
-        }
-        return user;
-      })
-      .catch((err) => {
-        return Promise.reject("Error updating user");
-      });
+      return decoded;
+    } catch (err) {
+      throw err;
+    }
   }
 
   function createToken(user) {
@@ -120,17 +133,6 @@ function UserService(UserModel) {
       }
     );
     return { auth: true, token };
-  }
-
-  function verifyToken(token) {
-    return new Promise(function (resolve, reject) {
-      jwt.verify(token, config.secret, function (err, decoded) {
-        if (err) {
-          reject();
-        }
-        return resolve(decoded);
-      });
-    });
   }
 
   function createPassword(user) {

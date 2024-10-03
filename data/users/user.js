@@ -14,12 +14,14 @@ let RoleSchema = new Schema({
 });
 
 let userSchema = new Schema({
+  name: { type: String, required: true },
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   passwordResetToken: { type: String, select: false },
   passwordResetExpires: { type: Date, select: false },
   role: { type: RoleSchema },
+  points: { type: Number, default: 0 },
 });
 
 let User = mongoose.model("User", userSchema);
