@@ -3,7 +3,6 @@ let Schema = mongoose.Schema;
 
 const seatSchema = new Schema({
   number: { type: String, required: true }, 
-  isAvailable: { type: Boolean, default: true }, 
 });
 
 let roomSchema = new Schema({
