@@ -9,6 +9,7 @@ function RoomService(roomModel) {
         updateById,
     };
 
+    // Cria uma nova sala
     async function create(room) {
         try {
             let newRoom = new roomModel(room);
@@ -28,57 +29,57 @@ function RoomService(roomModel) {
         }
     }
 
-    function findById(id) {
-        return roomModel
-            .findById(id)
-            .then((room) => {
-                if (!room) {
-                    return Promise.reject("Room not found");
-                }
-                return room;
-            })
-            .catch((err) => {
-                return Promise.reject("Error fetching room");
-            });
+    // Encontra uma sala pelo id
+    async function findById(id) {
+        try {
+            const room = await roomModel.findById(id);
+            if (!room) {
+                throw new Error("Room not found");
+            }
+            return room;
+        } catch (err) {
+            throw new Error("Error fetching room");
+        }
     }
 
-    function findAll() {
-        return roomModel
-            .find({})
-            .then((rooms) => {
-                return rooms;
-            })
-            .catch((err) => {
-                return Promise.reject("Error fetching rooms");
-            });
+    // Encontra todas as salas
+    async function findAll() {
+        try {
+            const rooms = await roomModel.find();
+            return rooms;
+        } catch (err) {
+            throw new Error("Error fetching rooms");
+        }
     }
 
-    function removeById(id) {
-        return roomModel
-            .findByIdAndRemove(id)
-            .then((room) => {
-                if (!room) {
-                    return Promise.reject("Room not found");
-                }
-                return room;
-            })
-            .catch((err) => {
-                return Promise.reject("Error removing room");
-            });
+    // Remove uma sala pelo id
+    async function removeById(id) {
+        try {
+            const room = await roomModel.findByIdAndDelete(id);
+            if (!room) {
+                throw new Error("Room not found");
+            }
+            return room;
+        } catch (err) {
+            console.log(err);
+            throw new Error("Error removing room");
+        }
     }
 
-    function updateById(id, room) {
-        return roomModel
-            .findByIdAndUpdate(id, room, { new: true })
-            .then((room) => {
-                if (!room) {
-                    return Promise.reject("Room not found");
-                }
-                return room;
-            })
-            .catch((err) => {
-                return Promise.reject("Error updating room");
+    // Atualiza uma sala pelo id
+    async function updateById(id, room) {
+        try {
+            const updatedRoom = await roomModel.findByIdAndUpdate(id, room, {
+                new: true,
             });
+            if (!updatedRoom) {
+                throw new Error("Room not found");
+            }
+            return updatedRoom;
+        }
+        catch (err) {
+            throw new Error("Error updating room");
+        }
     }
 
     return service;
