@@ -13,7 +13,9 @@ async function createRoom(req, res) {
         res.status(201).send(newRoom);
     } catch (error) {
         console.log(error);
-        res.status(500).send(error);
+        res.status(500)
+        .json({ message: error.message });
+        
     }
 }
 
