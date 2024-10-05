@@ -2,7 +2,11 @@ const movieService = require("../movies"); // O serviço que lida com a requisi�
 const movieModel = require("../movies"); // O modelo de filme
 
 const movieController = {
-  searchMovie,  
+  searchMovie,
+  getMoviesByGenre,
+  getMovieById,
+  getAllMovies,
+  removeMovie,
 };
 
 // Controlador para lidar com a busca de filmes
@@ -37,6 +41,74 @@ async function searchMovie(req, res) {
   } catch (error) {
     res.status(400).send({ error: error.message }); // Em caso de erro, retorna a mensagem
     console.log(error);
+  }
+}
+
+async function getMoviesByGenre(req, res) {
+  const { genre } = req.body; // Extrai o género da requisição
+
+  // Verifica se o género foi fornecido
+  if (!genre) {
+    return res.status(400).send({ error: "O género do filme é obrigatório" });
+  }
+
+  try {
+    // Chama o serviço que faz a requisição à OMDb API
+    const movies = await movieService.getMoviesByGenre(genre);
+
+    // Verifica se o filme já está no banco de dados
+    // ATENCAO- A API AINDA É USADA MESMO QUE VÁ BUSCAR AO BANCO DE DADOS. PARA CORRIGIR, COLOCAR
+    //ESTA PARTE DE CÓDIGO LOGO EM BAIXO DO try E COLOCAR PARA PROCURAR NO MÉTODO findOne
+    //O TÍTULO E O ANO(OPCIONAL) DO FILME
+    const existingMovie = await movieModel.findAll({ imdbID: movies.imdbID });
+    if (existingMovie) {
+      console.log(
+        "Filme já existe no banco de dados, acedendo à base de dados..."
+      );
+      return res.status(200).send(existingMovie); // Se o filme já existe, retorna-o
+    }
+
+    // Se não existir, salva no banco de dados
+    const newMovie = await movieModel.create(movie);
+
+    res.status(201).send(newMovie); // Retorna o filme recém-salvo
+  } catch (error) {
+    res.status(400).send({ error: error.message }); // Em caso de erro, retorna a mensagem
+    console.log(error);
+  }
+}
+
+// Controlador para obter um filme pelo ID
+async function getMovieById(req, res) {
+  try {
+    const { id } = req.params;
+    const movie = await movieService.findById(id);
+    res.status(200).send(movie);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(error);
+  }
+}
+
+// Controlador para obter todos os filmes
+async function getAllMovies(req, res) {
+  try {
+    const movies = await movieService.findAll();
+    res.status(200).send(movies);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(error);
+  }
+}
+
+async function removeMovie(req, res) {
+  try {
+    const { id } = req.params;
+    const movie = await movieService.removeById(id);
+    res.status(200).send(movie);
+  } catch (error) {
+    console.log(error);
+    res.status(500).send(error);
   }
 }
 

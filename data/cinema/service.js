@@ -1,3 +1,10 @@
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
+const Room = require("../rooms/rooms");
+const Movie = require("../movies/movies");
+const Session = require("../sessions/sessions");
+const Cinema = require("./cinema");
+
 function cinemaService(cinemaModel) {
   let service = {
     create,
@@ -10,6 +17,8 @@ function cinemaService(cinemaModel) {
     fillRoom,
     removeRoom,
     occupyRoom,
+    addMovie,
+    removeMovie,
   };
 
   // Cria um novo cinema
@@ -63,9 +72,6 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  
-
-
   // Encontra as salas de um cinema pelo id
   async function findRoomsById(id) {
     try {
@@ -75,7 +81,7 @@ function cinemaService(cinemaModel) {
       if (!cinema) {
         throw new Error("Cinema not found");
       }
-      return cinema.rooms;
+      return cinema.Rooms;
     } catch (err) {
 
       if (err.message === "Cinema not found") {
@@ -86,18 +92,47 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  function fillRoom(id, room) {
-    return cinemaModel
-      .findByIdAndUpdate(id, { $push: { rooms: room } }, { new: true })
-      .then((cinema) => {
-        if (!cinema) {
-          return Promise.reject("Cinema não encontrado");
-        }
-        return cinema;
-      })
-      .catch((err) => {
-        return Promise.reject("Erro ao adicionar sala ao cinema");
-      });
+  async function fillRoom(id, room, movie) {
+    try {
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new Error("Cinema not found");
+      }
+
+      // Encontra a sala pelo id
+      const roomIndex = cinema.rooms.findIndex((r) => r._id == room);
+      if (roomIndex === -1) {
+        throw new Error("Room not found");
+      }
+
+      // Verifica se a sala já está ocupada
+      if (cinema.rooms[roomIndex].occupied) {
+        throw new Error("Room already occupied");
+      }
+
+      // Encontra o filme pelo id
+      const movieFound = await Movie.findById(movie);
+      if (!movieFound) {
+        throw new Error("Movie not found");
+      }
+
+      // Encontra a sessão pelo id
+      const session = await Session.findById(movie);
+      if (!session) {
+        throw new Error("Session not found");
+      }
+
+      // Preenche a sala com o filme
+      cinema.rooms[roomIndex].movie = movie;
+      return await save(cinema);
+    }
+    catch (err) {
+      if (err.message === "Cinema not found" || err.message === "Room not found" || err.message === "Room already occupied" || err.message === "Movie not found" || err.message === "Session not found") {
+        throw err;
+      }
+      throw new Error("Erro ao preencher sala");
+    }
+    
   }
 
   // Remove uma sala de um cinema
@@ -136,22 +171,88 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  function occupyRoom(id, room) {
-    return cinemaModel
-      .findByIdAndUpdate(
-        { _id: id, "rooms._id": room },
-        { $set: { "rooms.$.occupied": true } },
-        { new: true }
-      )
-      .then((cinema) => {
-        if (!cinema) {
-          return Promise.reject("Cinema não encontrado");
-        }
-        return cinema;
-      })
-      .catch((err) => {
-        return Promise.reject("Erro ao ocupar sala do cinema");
-      });
+  async function occupyRoom(id, room, session) {
+    try {
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new Error("Cinema not found");
+      }
+      
+      // Encontra a sala pelo id
+      const roomIndex = cinema.rooms.findIndex((r) => r._id == room);
+      if (roomIndex === -1) {
+        throw new Error("Room not found");
+      }
+
+      // Verifica se a sala já está ocupada
+      if (cinema.rooms[roomIndex].occupied) {
+        throw new Error("Room already occupied");
+      }
+
+      // Ocupa a sala
+      cinema.rooms[roomIndex].occupied = true;
+      cinema.sessions.push(session);
+
+      return await save(cinema);
+    }
+    catch (err) {
+      if (err.message === "Cinema not found" || err.message === "Room not found" || err.message === "Room already occupied") {
+        throw err;
+      }
+      throw new Error("Erro ao ocupar sala");
+    }
+  }
+
+  async function addMovie(id, movie) {
+    try {
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new Error("Cinema not found");
+      }
+
+      const movieFound = await Movie.findById(movie);
+      if (!movieFound) {
+        throw new Error("Movie not found");
+      }
+
+      cinema.movies.push(movieFound);
+      return await save(cinema);
+    }
+    catch (err) {
+      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+        throw err;
+      }
+      throw new Error("Erro ao adicionar filme ao cinema");
+    }
+  }
+
+  // Remove um filme de um cinema
+  async function removeMovie(id, movie) {
+    try {
+
+      // Encontra o cinema pelo id
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new Error("Cinema not found");
+      }
+
+      // Encontra o filme pelo id
+      const movieIndex = cinema.movies.findIndex((m) => m._id == movie); //findIndex retorna o índice do elemento no array
+      // Se o filme não for encontrado, retorna um erro
+      if (movieIndex === -1) {
+        throw new Error("Movie not found");
+      }
+
+      // Remove o filme do array de filmes do cinema
+      cinema.movies.splice(movieIndex, 1);
+      return await save(cinema);
+    }
+    catch (err) {
+      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+        throw err;
+      }
+      throw new Error("Erro ao remover filme do cinema");
+    }
   }
 
   return service;

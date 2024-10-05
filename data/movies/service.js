@@ -5,11 +5,21 @@ function MovieService(movieModel) {
   let service = {
     create,
     getMovieByTitleYearAndPlot,
+    getMoviesByGenre,
+    findById,
+    findAll,
+    removeById,
   };
 
-  function create(movie) {
-    let newMovie = new movieModel(movie);
-    return newMovie.save();
+  async function create(movie) {
+    try {
+      let newMovie = new movieModel(movie);
+      let savedMovie = await newMovie.save();
+      return savedMovie;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Erro ao criar o filme: ${error.message}`);
+    }
   }
 
   // Função para buscar um filme pelo título e ano na API OMDb
@@ -85,6 +95,73 @@ function MovieService(movieModel) {
     } catch (error) {
       console.log(error)
       throw new Error(`Erro ao buscar o filme: ${error.message}`);
+    }
+  }
+
+  // Função para buscar filmes por género na API OMDb
+  async function getMoviesByGenre(genre) {
+    try {
+      const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
+        params: {
+          genre: genre,
+          apikey: MOVIE_API_KEY,
+        },
+      });
+
+      if (response.data.Response === "False") {
+        throw new Error(response.data.Error);
+      }
+
+      const moviesData = response.data.Search;
+
+      const movies = moviesData.map((movieData) => ({
+        title: movieData.Title,
+        year: movieData.Year,
+        imdbID: movieData.imdbID,
+        type: movieData.Type,
+        poster: movieData.Poster,
+      }));
+
+      return movies;
+    } catch (error) {
+      throw new Error(`Erro ao buscar os filmes: ${error.message}`);
+    }
+  }
+
+  // Função para buscar um filme pelo ID no banco de dados
+  async function findById(id) {
+    try {
+      const movie = await movieModel.findById(id);
+      if (!movie) {
+        throw new Error("Filme não encontrado");
+      }
+      return movie;
+    } catch (err) {
+      throw new Error("Erro ao buscar o filme");
+    }
+  }
+
+  // Função para buscar todos os filmes no banco de dados
+  async function findAll() {
+    try {
+      const movies = await movieModel.find();
+      return movies;
+    } catch (err) {
+      throw new Error("Erro ao buscar os filmes");
+    }
+  }
+
+  // Função para remover um filme pelo ID no banco de dados
+  async function removeById(id) {
+    try {
+      const movie = await movieModel.findByIdAndDelete(id);
+      if (!movie) {
+        throw new Error("Filme não encontrado");
+      }
+      return movie;
+    } catch (err) {
+      console.log(err);
+      throw new Error("Erro ao remover o filme");
     }
   }
 

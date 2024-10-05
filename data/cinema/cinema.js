@@ -5,9 +5,14 @@ const Room = require('../rooms/rooms');
 const cinemaSchema = new Schema({
     name: { type: String, required: true },
     address: { type: String, required: true },
+    movies: [{ type: Schema.Types.ObjectId, ref: 'Movie' }],
+    sessions: [{
+        movie: { type: Schema.Types.ObjectId, ref: 'Movie', required: true },
+        time: { type: Date, required: true },
+        room: { type: Schema.Types.ObjectId, ref: 'Room', required: true }
+    }],
     rooms: [{ type: Schema.Types.ObjectId, ref: 'Room' }],
 });
-
 
 // Middleware para remover salas associadas quando um cinema é deletado
 cinemaSchema.pre("findOneAndDelete", async function (next) {
