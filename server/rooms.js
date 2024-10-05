@@ -15,6 +15,8 @@ function RoomsRouter() {
     router.get("/findAll", roomsController.getAllRooms);
 
     router.delete("/remove/:id", roomsController.removeRoomById);
+
+    router.put("/update/:id", roomsController.updateRoomById);
     
     return router;
 }

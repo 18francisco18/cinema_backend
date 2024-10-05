@@ -38,7 +38,10 @@ function RoomService(roomModel) {
             }
             return room;
         } catch (err) {
-            throw new Error("Error fetching room");
+            if (err.message === "Room not found") {
+            throw err; // Re-lança o erro "Room not found"
+        }
+        throw new Error("Error fetching room");
         }
     }
 
@@ -62,9 +65,15 @@ function RoomService(roomModel) {
             return room;
         } catch (err) {
             console.log(err);
+
+            if (err.message === "Room not found") {
+                throw err;
+            }  
             throw new Error("Error removing room");
         }
     }
+
+    
 
     // Atualiza uma sala pelo id
     async function updateById(id, room) {
@@ -78,6 +87,9 @@ function RoomService(roomModel) {
             return updatedRoom;
         }
         catch (err) {
+            if (err.message === "Room not found") {
+              throw err;
+            }
             throw new Error("Error updating room");
         }
     }

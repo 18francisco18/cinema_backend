@@ -10,6 +10,11 @@ function CinemaRouter() {
     
     router.post("/create", cinemaController.createCinema);
     router.get("/all", cinemaController.findAllCinemas);
+    router.get("/find/:id", cinemaController.findCinemaById);
+    router.put("/update/:id", cinemaController.updateCinemaById);
+    router.get("/findRoom/:id", cinemaController.findCinemaRoomsById);
+    router.delete("/removeRoom/:id/:roomId", cinemaController.removeCinemaRoomById);
+    router.delete("/remove/:id", cinemaController.removeCinemaById);
     
     return router;
 }
