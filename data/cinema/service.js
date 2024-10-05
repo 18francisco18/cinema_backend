@@ -14,11 +14,12 @@ function cinemaService(cinemaModel) {
     findByIdAndUpdate,
     removeCinemaById,
     findRoomsById,
-    fillRoom,
+    //fillRoom,
     removeRoom,
     occupyRoom,
     addMovie,
     removeMovie,
+    addMoviesToBillboard,
   };
 
   // Cria um novo cinema
@@ -92,6 +93,7 @@ function cinemaService(cinemaModel) {
     }
   }
 
+  /*
   async function fillRoom(id, room, movie) {
     try {
       const cinema = await cinemaModel.findById(id);
@@ -134,6 +136,7 @@ function cinemaService(cinemaModel) {
     }
     
   }
+  */
 
   // Remove uma sala de um cinema
   async function removeRoom(id, room) {
@@ -252,6 +255,30 @@ function cinemaService(cinemaModel) {
         throw err;
       }
       throw new Error("Erro ao remover filme do cinema");
+    }
+  }
+
+  async function addMoviesToBillboard(cinemaId, movieList) {
+    try {
+      const cinema = await Cinema.findById(cinemaId);
+      if (!cinema) throw new Error("Cinema not found");
+  
+      // Filtrar filmes que já estão no cartaz
+      const newMovies = movieList.filter(movieId => !cinema.billboard.includes(movieId));
+  
+      // Verifica se todos os filmes existem no banco de dados
+      for (const movieId of newMovies) {
+        const movie = await Movie.findById(movieId);
+        if (!movie) throw new Error(`Movie with id ${movieId} not found`);
+      }
+  
+      // Adiciona os novos filmes ao cartaz
+      cinema.billboard = [...cinema.billboard, ...newMovies];
+      await cinema.save();
+  
+      return cinema;
+    } catch (err) {
+      throw new Error("Error adding movies to billboard: " + err.message);
     }
   }
 
