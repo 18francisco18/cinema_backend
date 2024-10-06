@@ -258,27 +258,36 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  async function addMoviesToBillboard(cinemaId, movieList) {
+  // Adiciona filmes ao cartaz de um cinema
+  async function addMoviesToBillboard(id, movies) {
     try {
-      const cinema = await Cinema.findById(cinemaId);
-      if (!cinema) throw new Error("Cinema not found");
-  
-      // Filtrar filmes que já estão no cartaz
-      const newMovies = movieList.filter(movieId => !cinema.billboard.includes(movieId));
-  
-      // Verifica se todos os filmes existem no banco de dados
-      for (const movieId of newMovies) {
-        const movie = await Movie.findById(movieId);
-        if (!movie) throw new Error(`Movie with id ${movieId} not found`);
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new Error("Cinema not found");
       }
-  
-      // Adiciona os novos filmes ao cartaz
-      cinema.billboard = [...cinema.billboard, ...newMovies];
-      await cinema.save();
-  
-      return cinema;
-    } catch (err) {
-      throw new Error("Error adding movies to billboard: " + err.message);
+
+      // Separa os ids dos filmes em um array
+      const moviesArray = movies.split(",");
+      // Cria um array para adicionar os filmes
+      const moviesToAdd = [];
+      // Para cada id de filme, encontra o filme pelo id e adiciona ao array
+      for (let i = 0; i < moviesArray.length; i++) {
+        const movie = await Movie.findById(moviesArray[i]);
+        if (!movie) {
+          throw new Error("Movie not found");
+        }
+        moviesToAdd.push(movie);
+      }
+
+      // Adiciona os filmes ao cartaz do cinema
+      cinema.movies = moviesToAdd;
+      return await save(cinema);
+    }
+    catch (err) {
+      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+        throw err;
+      }
+      throw new Error("Erro ao adicionar filmes ao cinema");
     }
   }
 
