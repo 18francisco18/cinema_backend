@@ -24,8 +24,6 @@ function MovieService(movieModel) {
 
   // Função para buscar um filme pelo título e ano na API OMDb
   async function getMovieByTitleYearAndPlot(title, year, plot) {
-    console.log("chamei a funçao getMovieByTitleYearAndPlot");
-
     try {
       // Busca o filme na API OMDb através do título e ano, cujos titulos e anos são passados
       //como parametros no pedido à API, pois a API OMDb permite pesquisar filmes por título e ano.

@@ -260,7 +260,7 @@ function cinemaService(cinemaModel) {
 
   async function addMoviesToBillboard(cinemaId, movieList) {
     try {
-      const cinema = await Cinema.findById(cinemaId);
+      const cinema = await cinemaModel.findById(cinemaId);
       if (!cinema) throw new Error("Cinema not found");
   
       // Filtrar filmes que já estão no cartaz

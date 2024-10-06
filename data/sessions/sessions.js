@@ -20,7 +20,7 @@ const sessionSchema = new Schema({
   endTime: { type: Date, required: true },
   status: {
     type: String,
-    enum: ["available", "sold out", "cancelled"],
+    enum: ["available", "sold out", "cancelled", "in progress", "finished"],
     default: "available",
   },
   seats: [[seatStatusSchema]],

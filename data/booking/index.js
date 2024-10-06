@@ -1,5 +1,5 @@
 const booking = require("./booking");
-const bookingService = require("./service");
+const BookingService = require("./service");
 
-const bookingService = bookingService(booking)
+const bookingService = BookingService(booking)
 module.exports = bookingService;

@@ -207,7 +207,7 @@ async function addMoviesToBillboard(req, res) {
         } else {
             res.status(200).json(cinema);
             console.log("Movies added to billboard");
-        }
+        }   
     } catch (error) {
         console.log(error);
         if (error.message === "Cinema not found") {
