@@ -17,7 +17,7 @@ function CinemaRouter() {
     router.delete("/remove/:id", cinemaController.removeCinemaById);
     router.put("/addMovie/:id/:roomId", cinemaController.addMovieToRoom);
     router.put("/removeMovie/:id/:roomId", cinemaController.removeMovieFromRoom);
-    router.post("/addMoviesToBillboard/:id", cinemaController.addMoviesToBillboard);
+    router.post("/addMoviesToBillboard/:id/:movies", cinemaController.addMoviesToBillboard);
     
     return router;
 }
