@@ -200,7 +200,9 @@ async function removeMovieFromRoom(req, res) {
 
 async function addMoviesToBillboard(req, res) {
     try {
-        const { id, movies } = req.params;
+        const { id } = req.params;
+        const { movies } = req.body;
+        
         const cinema = await cinemaService.addMoviesToBillboard(id, movies);
         if (!cinema) {
             res.status(404).json({ error: "Cinema not found" });

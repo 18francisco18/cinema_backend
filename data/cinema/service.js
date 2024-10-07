@@ -76,7 +76,7 @@ function cinemaService(cinemaModel) {
   // Encontra as salas de um cinema pelo id
   async function findRoomsById(id) {
     try {
-      // Encontrar o cinema pelo id e popular as salas (populate serve para buscar toda a informação 
+      // Encontrar o cinema pelo id e popular as salas (populate serve para buscar toda a informação
       //da sala através do seu id)
       const cinema = await cinemaModel.findById(id).populate("rooms");
       if (!cinema) {
@@ -84,7 +84,6 @@ function cinemaService(cinemaModel) {
       }
       return cinema.Rooms;
     } catch (err) {
-
       if (err.message === "Cinema not found") {
         throw err;
       }
@@ -164,7 +163,9 @@ function cinemaService(cinemaModel) {
       // Utilizado functionName para identificar a função que está a ser chamada, de forma
       // a poder identificar a função no .pre utilizado no modelo de cinema devido a necessidade
       // de futuramente utilizar mais findByIdAndDelete, evitando conflitos.
-      const cinema = await cinemaModel.findByIdAndDelete(id, { functionName: "removeCinemaById" });
+      const cinema = await cinemaModel.findByIdAndDelete(id, {
+        functionName: "removeCinemaById",
+      });
       if (!cinema) {
         throw new Error("Cinema not found");
       }
@@ -180,7 +181,7 @@ function cinemaService(cinemaModel) {
       if (!cinema) {
         throw new Error("Cinema not found");
       }
-      
+
       // Encontra a sala pelo id
       const roomIndex = cinema.rooms.findIndex((r) => r._id == room);
       if (roomIndex === -1) {
@@ -197,9 +198,12 @@ function cinemaService(cinemaModel) {
       cinema.sessions.push(session);
 
       return await save(cinema);
-    }
-    catch (err) {
-      if (err.message === "Cinema not found" || err.message === "Room not found" || err.message === "Room already occupied") {
+    } catch (err) {
+      if (
+        err.message === "Cinema not found" ||
+        err.message === "Room not found" ||
+        err.message === "Room already occupied"
+      ) {
         throw err;
       }
       throw new Error("Erro ao ocupar sala");
@@ -220,9 +224,11 @@ function cinemaService(cinemaModel) {
 
       cinema.movies.push(movieFound);
       return await save(cinema);
-    }
-    catch (err) {
-      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+    } catch (err) {
+      if (
+        err.message === "Cinema not found" ||
+        err.message === "Movie not found"
+      ) {
         throw err;
       }
       throw new Error("Erro ao adicionar filme ao cinema");
@@ -232,7 +238,6 @@ function cinemaService(cinemaModel) {
   // Remove um filme de um cinema
   async function removeMovie(id, movie) {
     try {
-
       // Encontra o cinema pelo id
       const cinema = await cinemaModel.findById(id);
       if (!cinema) {
@@ -249,16 +254,18 @@ function cinemaService(cinemaModel) {
       // Remove o filme do array de filmes do cinema
       cinema.movies.splice(movieIndex, 1);
       return await save(cinema);
-    }
-    catch (err) {
-      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+    } catch (err) {
+      if (
+        err.message === "Cinema not found" ||
+        err.message === "Movie not found"
+      ) {
         throw err;
       }
       throw new Error("Erro ao remover filme do cinema");
     }
   }
 
-  // Adiciona filmes ao cartaz de um cinema
+  // Adiciona múltiplos filmes ao cartaz de um cinema (usando POST)
   async function addMoviesToBillboard(id, movies) {
     try {
       const cinema = await cinemaModel.findById(id);
@@ -266,25 +273,32 @@ function cinemaService(cinemaModel) {
         throw new Error("Cinema not found");
       }
 
-      // Separa os ids dos filmes em um array
-      const moviesArray = movies.split(",");
-      // Cria um array para adicionar os filmes
+      // Cria um array para armazenar os IDs dos filmes que serão adicionados
       const moviesToAdd = [];
-      // Para cada id de filme, encontra o filme pelo id e adiciona ao array
-      for (let i = 0; i < moviesArray.length; i++) {
-        const movie = await Movie.findById(moviesArray[i]);
+
+      // Itera sobre o array de IDs de filmes recebidos
+      for (let i = 0; i < movies.length; i++) {
+        const movie = await Movie.findById(movies[i]);
         if (!movie) {
-          throw new Error("Movie not found");
+          throw new Error(`Movie with ID ${movies[i]} not found`);
         }
-        moviesToAdd.push(movie);
+
+        // Adiciona o ID do filme ao array apenas se ainda não estiver no cartaz
+        if (!cinema.movies.includes(movie._id)) {
+          moviesToAdd.push(movie._id);
+        }
       }
 
-      // Adiciona os filmes ao cartaz do cinema
-      cinema.movies = moviesToAdd;
-      return await save(cinema);
-    }
-    catch (err) {
-      if (err.message === "Cinema not found" || err.message === "Movie not found") {
+      // Adiciona os novos filmes ao array de filmes existentes
+      cinema.movies.push(...moviesToAdd);
+      await cinema.save();
+
+      return cinema;
+    } catch (err) {
+      if (
+        err.message === "Cinema not found" ||
+        err.message.startsWith("Movie with ID")
+      ) {
         throw err;
       }
       throw new Error("Erro ao adicionar filmes ao cinema");
