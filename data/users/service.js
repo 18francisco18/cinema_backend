@@ -4,42 +4,52 @@ const config = require("../../config");
 
 function UserService(UserModel) {
   let service = {
-    create,   //feito
-    findAll,  //feito
+    create, //feito
+    findAll, //feito
     findById, //feito
-    findUser,  //feito
-    removeById,  //feito
-    updateUser,  //feito
-    createPassword,  //feito
-    comparePassword,  //feito
-    verifyToken,  //feito
-    createToken,   //feito
+    findUser, //feito
+    removeById, //feito
+    updateUser, //feito
+    createPassword, //feito
+    comparePassword, //feito
+    verifyToken, //feito
+    createToken, //feito
   };
 
-  // Converte para async
   async function create(user) {
     try {
+      // Cria a senha criptografada
       const hashPassword = await createPassword(user);
+
+      // Monta o novo objeto do usuário com a senha criptografada
       let newUserWithPassword = {
         ...user,
         password: hashPassword,
       };
+
+      // Cria uma nova instância do modelo de usuário
       let newUser = new UserModel(newUserWithPassword);
-      return await save(newUser);
+
+      // Tenta salvar o novo usuário no banco de dados
+      const result = await save(newUser);
+      return result;
     } catch (err) {
+      console.error("Error in create function:", err); // Adicionando um log mais detalhado
       return Promise.reject("Not Saved");
     }
   }
 
-  // Converte para async
   async function save(model) {
-    try {
-      await model.save();
-      return "User created";
-    } catch (err) {
-      return Promise.reject(`There is a problem with register ${err}`);
-    }
+  try {
+    // Tenta salvar o modelo no banco de dados
+    await model.save();
+    return "User created";
+  } catch (err) {
+    console.error("Error saving user:", err);  // Adicionando um log mais detalhado
+    return Promise.reject(`There is a problem with register: ${err.message}`);
   }
+}
+
 
   // Converte para async
   async function findById(id) {
@@ -99,7 +109,9 @@ function UserService(UserModel) {
   // Converte para async
   async function updateUser(id, updateData) {
     try {
-      const user = await UserModel.findByIdAndUpdate(id, updateData, { new: true });
+      const user = await UserModel.findByIdAndUpdate(id, updateData, {
+        new: true,
+      });
       if (!user) {
         return Promise.reject("User not found");
       }

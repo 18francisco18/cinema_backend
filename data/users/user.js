@@ -21,7 +21,7 @@ let userSchema = new Schema({
   passwordResetToken: { type: String, select: false },
   passwordResetExpires: { type: Date, select: false },
   role: { type: RoleSchema },
-  points: { type: Number, default: 0 },
+  points: { type: Number, default: 0, required: false },
 });
 
 let User = mongoose.model("User", userSchema);
