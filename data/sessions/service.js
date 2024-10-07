@@ -3,6 +3,7 @@ const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
 //Variável da rooms
 const RoomModel = require("../rooms");
 const Room = require("../rooms/rooms");
+const Session = require("./sessions");
 
 function sessionService(sessionModel) {
   let service = {
@@ -19,198 +20,241 @@ function sessionService(sessionModel) {
     releaseSeat,
   };
 
-  function create(session) {
-    let newSession = new sessionModel(session);
-    return newSession.save();
+  // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
+  async function create(
+    roomId,
+    movieId,
+    date,
+    price,
+    startTime,
+    endTime
+  ) {
+    try {
+      // Buscar o layout da Room pelo ID
+      const room = await Room.findById(roomId);
+      if (!room) {
+        console.log(room);
+        throw new Error("Room not found");
+      }
+
+      // Acessar o layout de assentos da Room e mapear para a Session
+      const seatLayout = room.layout.map((row) => {
+        return row.map((seat) => ({
+          seatNumber: seat.number,
+          status: "available", // Define o estado inicial como 'available'
+        }));
+      });
+
+      // Criar uma nova sessão e associar o layout de assentos
+      const session = new Session({
+        room: roomId,
+        movie: movieId,
+        date: date,
+        price: price,
+        startTime: startTime,
+        endTime: endTime,
+        seats: seatLayout, // Assentos copiados diretamente do layout da Room
+      });
+
+      // Salvar a nova sessão no banco de dados
+      await session.save();
+      return session;
+    } catch (error) {
+      console.error(error);
+      throw new Error("Erro ao criar a sessão com os assentos da sala");
+    }
   }
 
   function findAll() {
-    return sessionModel.find({}).populate("movie").populate("room").populate("cinema").populate("tickets");
+    return sessionModel
+      .find({})
+      .populate("movie")
+      .populate("room")
+      .populate("cinema")
+      .populate("tickets");
   }
 
   async function getMovieByTitleYearAndPlot(title, year, plot) {
-        console.log("chamei a funçao getMovieByTitleYearAndPlot");
+    console.log("chamei a funçao getMovieByTitleYearAndPlot");
 
-        try {
-        const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
-                params: {
-                t: title,
-                y: year,
-                plot: plot,
-                apikey: MOVIE_API_KEY,
-                },
-            });
-            if (response.data.Response === "False") {
-            console.log("erro");
-            throw new Error(response.data.Error);
-            }
-            const movieData = response.data;
-            const transformedRatings = (movieData.Ratings || []).map((rating) => ({
-            source: rating.Source || "N/A",
-            value: rating.Value || "N/A",
-            }));
+    try {
+      const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
+        params: {
+          t: title,
+          y: year,
+          plot: plot,
+          apikey: MOVIE_API_KEY,
+        },
+      });
+      if (response.data.Response === "False") {
+        console.log("erro");
+        throw new Error(response.data.Error);
+      }
+      const movieData = response.data;
+      const transformedRatings = (movieData.Ratings || []).map((rating) => ({
+        source: rating.Source || "N/A",
+        value: rating.Value || "N/A",
+      }));
 
-            const completeMovieData = {
-                title: movieData.Title || "N/A",
-                year: movieData.Year || "N/A",
-                rated: movieData.Rated || "N/A",
-                released: movieData.Released || "N/A",
-                runtime: movieData.Runtime || "N/A",
-                genre: movieData.Genre || "N/A",
-                director: movieData.Director || "N/A",
-                writer: movieData.Writer || "N/A",
-                actors: movieData.Actors || "N/A",
-                plot: movieData.Plot || "N/A",
+      const completeMovieData = {
+        title: movieData.Title || "N/A",
+        year: movieData.Year || "N/A",
+        rated: movieData.Rated || "N/A",
+        released: movieData.Released || "N/A",
+        runtime: movieData.Runtime || "N/A",
+        genre: movieData.Genre || "N/A",
+        director: movieData.Director || "N/A",
+        writer: movieData.Writer || "N/A",
+        actors: movieData.Actors || "N/A",
+        plot: movieData.Plot || "N/A",
 
-                // Transforma o array de avaliações (Ratings) em um array de objetos com os campos source e value
+        // Transforma o array de avaliações (Ratings) em um array de objetos com os campos source e value
 
-                ratings: transformedRatings,
-                poster: movieData.Poster || "N/A",
-                metascore: movieData.Metascore || "N/A",
-                imdbRating: movieData.imdbRating || "N/A",
-                imdbVotes: movieData.imdbVotes || "N/A",
-                imdbID: movieData.imdbID || "N/A",
-                type: movieData.Type || "N/A",
-                dvd: movieData.DVD || "N/A",
-                boxOffice: movieData.BoxOffice || "N/A",
-                production: movieData.Production || "N/A",
-                website: movieData.Website || "N/A",
-                response: movieData.Response || "N/A",
-            };
-            return completeMovieData;
-        } 
-    
-        catch (error) {
-            console.log(error);
-            throw new Error(`Error getting movie: ${error.message}`);
-        }
+        ratings: transformedRatings,
+        poster: movieData.Poster || "N/A",
+        metascore: movieData.Metascore || "N/A",
+        imdbRating: movieData.imdbRating || "N/A",
+        imdbVotes: movieData.imdbVotes || "N/A",
+        imdbID: movieData.imdbID || "N/A",
+        type: movieData.Type || "N/A",
+        dvd: movieData.DVD || "N/A",
+        boxOffice: movieData.BoxOffice || "N/A",
+        production: movieData.Production || "N/A",
+        website: movieData.Website || "N/A",
+        response: movieData.Response || "N/A",
+      };
+      return completeMovieData;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error getting movie: ${error.message}`);
     }
+  }
 
-    async function checkAvailability(sessionId) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let room = await RoomModel.findById(session.room);
-            let tickets = await sessionModel.findById(sessionId).populate("tickets");
+  async function checkAvailability(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let room = await RoomModel.findById(session.room);
+      let tickets = await sessionModel.findById(sessionId).populate("tickets");
 
-            let availableSeats = room.seats - tickets.length;
-            return availableSeats;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error checking availability: ${error.message}`);
-        }
+      let availableSeats = room.seats - tickets.length;
+      return availableSeats;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error checking availability: ${error.message}`);
     }
+  }
 
-    async function bookSession(sessionId, tickets) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { $push: { tickets: tickets } },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error booking session: ${error.message}`);
-        }
+  async function bookSession(sessionId, tickets) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { $push: { tickets: tickets } },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error booking session: ${error.message}`);
     }
+  }
 
-    async function confirmPayment(sessionId) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { paymentConfirmed: true },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error confirming payment: ${error.message}`);
-        }
+  async function confirmPayment(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { paymentConfirmed: true },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error confirming payment: ${error.message}`);
     }
+  }
 
-    async function cancelPayment(sessionId) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { paymentConfirmed: false },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error cancelling payment: ${error.message}`);
-        }
+  async function cancelPayment(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { paymentConfirmed: false },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error cancelling payment: ${error.message}`);
     }
+  }
 
-    async function showSeatsAvailable(sessionId) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let room = await RoomModel.findById(session.room);
-            let tickets = await sessionModel.findById(sessionId).populate("tickets");
+  async function showSeatsAvailable(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let room = await RoomModel.findById(session.room);
+      let tickets = await sessionModel.findById(sessionId).populate("tickets");
 
-            let availableSeats = room.seats - tickets.length;
-            return availableSeats;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error showing available seats: ${error.message}`);
-        }
+      let availableSeats = room.seats - tickets.length;
+      return availableSeats;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error showing available seats: ${error.message}`);
     }
+  }
 
-    async function occupySeat(sessionId, seat) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { $push: { occupiedSeats: seat } },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error occupying seat: ${error.message}`);
-        }
+  async function occupySeat(sessionId, seat) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { $push: { occupiedSeats: seat } },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error occupying seat: ${error.message}`);
     }
+  }
 
-    async function confirmSeat(sessionId, seat) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { $push: { confirmedSeats: seat } },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error confirming seat: ${error.message}`);
-        }
+  async function confirmSeat(sessionId, seat) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { $push: { confirmedSeats: seat } },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error confirming seat: ${error.message}`);
     }
+  }
 
-    async function releaseSeat(sessionId, seat) {
-        try {
-            let session = await sessionModel.findById(sessionId);
-            let updatedSession = session;
-            updatedSession = await sessionModel.findByIdAndUpdate(
-                sessionId,
-                { $pull: { confirmedSeats: seat } },
-                { new: true }
-            );
-            return updatedSession;
-        } catch (error) {
-            console.log(error);
-            throw new Error(`Error releasing seat: ${error.message}`);
-        }
+  async function releaseSeat(sessionId, seat) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      let updatedSession = session;
+      updatedSession = await sessionModel.findByIdAndUpdate(
+        sessionId,
+        { $pull: { confirmedSeats: seat } },
+        { new: true }
+      );
+      return updatedSession;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error releasing seat: ${error.message}`);
     }
+  }
 
-    return service;
+  return service;
 }
 
 module.exports = sessionService;

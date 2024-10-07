@@ -3,6 +3,7 @@ const Schema = mongoose.Schema;
 const Booking = require('../booking/booking');
 
 const ticketSchema = new Schema({
+  ticketNumber: { type: Number, required: true},
   booking: { type: Schema.Types.ObjectId, ref: "Booking", required: true },
   seat: {
     seatNumber: { type: String, required: true }, 

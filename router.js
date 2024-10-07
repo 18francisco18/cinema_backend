@@ -6,6 +6,7 @@ let CinemaAPI = require("./server/cinema");
 let RoomsAPI = require("./server/rooms");
 let BookingAPI = require("./server/booking");
 let PasswordAPI = require("./server/password");
+let SessionsAPI = require("./server/sessions");
 
 function init() {
   let api = express();
@@ -17,6 +18,7 @@ function init() {
   api.use("/cinemas", CinemaAPI());
   api.use("/rooms", RoomsAPI());
   api.use("/bookings", BookingAPI());
+  api.use("/sessions", SessionsAPI());
 
   return api;
 }

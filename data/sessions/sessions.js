@@ -15,7 +15,6 @@ const sessionSchema = new Schema({
   movie: { type: Schema.Types.ObjectId, ref: "Movie", required: true },
   date: { type: Date, required: true },
   price: { type: Number, required: true },
-  tickets: [{ type: Schema.Types.ObjectId, ref: "Ticket" }],
   startTime: { type: Date, required: true },
   endTime: { type: Date, required: true },
   status: {

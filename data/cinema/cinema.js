@@ -6,11 +6,7 @@ const cinemaSchema = new Schema({
     name: { type: String, required: true },
     address: { type: String, required: true },
     movies: [{ type: Schema.Types.ObjectId, ref: 'Movie' }],
-    sessions: [{
-        movie: { type: Schema.Types.ObjectId, ref: 'Movie', required: true },
-        time: { type: Date, required: true },
-        room: { type: Schema.Types.ObjectId, ref: 'Room', required: true }
-    }],
+    sessions: [{ type: Schema.Types.ObjectId, ref: 'Session', required: true }],
     rooms: [{ type: Schema.Types.ObjectId, ref: 'Room' }],
 });
 

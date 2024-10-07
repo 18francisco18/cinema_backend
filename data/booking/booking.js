@@ -6,7 +6,7 @@ const bookingSchema = new Schema({
     room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
     session: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
     date: { type: Date, required: true },
-    price: { type: Number, required: true },
+
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);

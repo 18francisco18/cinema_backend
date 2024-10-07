@@ -18,7 +18,7 @@ function bookingService(bookingModel) {
 
         const existingBooking = await bookingModel.findOne({
           session: booking.session,
-          seat: booking.seat,
+          seat: booking.session.seats,
         });
 
         if (existingBooking) {
