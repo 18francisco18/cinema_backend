@@ -20,6 +20,7 @@ function cinemaService(cinemaModel) {
     addMovie,
     removeMovie,
     addMoviesToBillboard,
+    getAllCinemaMovies,
   };
 
   // Cria um novo cinema
@@ -302,6 +303,26 @@ function cinemaService(cinemaModel) {
         throw err;
       }
       throw new Error("Erro ao adicionar filmes ao cinema");
+    }
+  }
+
+  // Busca todos os filmes de um cinema
+  async function getAllCinemaMovies(id) {
+    try {
+      const cinema = await cinemaModel.findById(id).populate("movies");
+      if (!cinema) {
+        console.log(err);
+        throw new Error("Cinema not found");
+        
+      }
+
+      return cinema.movies;
+    } catch (err) {
+      if (err.message === "Cinema not found") {
+        console.log(err);
+        throw err;
+      }
+      throw new Error("Erro ao buscar filmes do cinema");
     }
   }
 

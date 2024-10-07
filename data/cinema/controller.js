@@ -14,6 +14,7 @@ const cinemaController = {
     addMovieToRoom,
     removeMovieFromRoom,
     addMoviesToBillboard,
+    getAllCinemaMovies,
 }
 
 
@@ -220,6 +221,19 @@ async function addMoviesToBillboard(req, res) {
     }
 }
 
-
+async function getAllCinemaMovies(req, res) {
+    try {
+        const { id } = req.params;
+        const movies = await cinemaService.getAllCinemaMovies(id);
+        res.status(200).send(movies);
+    } catch (error) {
+        console.log(error);
+        if (error.message === "Cinema not found") {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Internal Server Error" });
+        }
+    }
+}
 
 module.exports = cinemaController;
