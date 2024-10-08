@@ -4,6 +4,7 @@ const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
 const RoomModel = require("../rooms");
 const Room = require("../rooms/rooms");
 const Session = require("./sessions");
+const Movie = require("../movies/movies");
 
 function sessionService(sessionModel) {
   let service = {
@@ -19,6 +20,10 @@ function sessionService(sessionModel) {
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
+  // O create possui este formato pois é extremamente importante verificar a existencia
+  // dos ids de Room e Movie e garantir a cópia dos assentos de uma sala antes de criar a Session.
+  // Não só serve para garantir a integridade dos dados e evitar erros de referência, como também
+  // aplicar mais facilmente restrições no processo de criação.
   async function create(
     roomId,
     movieId,
@@ -31,11 +36,17 @@ function sessionService(sessionModel) {
       // Buscar o layout da Room pelo ID
       const room = await Room.findById(roomId);
       if (!room) {
-        console.log(room);
         throw new Error("Room not found");
       }
 
+      const movie = await Movie.findById(movieId);
+      if (!movie) {
+        throw new Error("Movie not found");
+      }
+
       // Acessar o layout de assentos da Room e mapear para a Session
+      // Para cada objeto "row", mapear cada objeto "seat" e retornar 
+      // um objeto com o número do assento e o estado inicial
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
           seatNumber: seat.number,
@@ -43,7 +54,7 @@ function sessionService(sessionModel) {
         }));
       });
 
-      // Criar uma nova sessão e associar o layout de assentos
+      // Criar uma nova sessão com os dados e associar o layout de assentos
       const session = new Session({
         room: roomId,
         movie: movieId,
@@ -59,22 +70,20 @@ function sessionService(sessionModel) {
       return session;
     } catch (error) {
       console.error(error);
-      throw new Error("Erro ao criar a sessão com os assentos da sala");
+
+      if (error.message === "Room not found") {
+        throw new Error("Room not found");
+      }
+
+      if (error.message === "Movie not found") {
+        throw new Error("Movie not found");
+      }
+
+      throw new Error("Internal server error");
     }
   }
 
-  // Função para buscar todas as sessões no banco de dados
-  async function findAll() {
-    try {
-      const sessions = await sessionModel.find();
-      return sessions;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Erro ao buscar as sessões: ${error.message}`);
-    }
-  }
-
-  // Função para verificar a disponibilidade de assentos em uma sessão
+  
   async function checkAvailability(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);

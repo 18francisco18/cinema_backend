@@ -25,6 +25,10 @@ async function createSession(req, res) {
       return res.status(404).json({ error: 'Sala não encontrada' });
     }
 
+    if (error.message === 'Movie not found') {
+      return res.status(404).json({ error: 'Filme não encontrado' });
+    }
+
     res.status(500).json({ error: 'Erro ao criar a sessão' });
   }
 }
