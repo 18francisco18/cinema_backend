@@ -14,7 +14,6 @@ function cinemaService(cinemaModel) {
     findByIdAndUpdate,
     removeCinemaById,
     findRoomsById,
-    //fillRoom,
     removeRoom,
     occupyRoom,
     addMovie,
@@ -92,51 +91,6 @@ function cinemaService(cinemaModel) {
       throw new Error("Erro ao buscar salas do cinema");
     }
   }
-
-  /*
-  async function fillRoom(id, room, movie) {
-    try {
-      const cinema = await cinemaModel.findById(id);
-      if (!cinema) {
-        throw new Error("Cinema not found");
-      }
-
-      // Encontra a sala pelo id
-      const roomIndex = cinema.rooms.findIndex((r) => r._id == room);
-      if (roomIndex === -1) {
-        throw new Error("Room not found");
-      }
-
-      // Verifica se a sala já está ocupada
-      if (cinema.rooms[roomIndex].occupied) {
-        throw new Error("Room already occupied");
-      }
-
-      // Encontra o filme pelo id
-      const movieFound = await Movie.findById(movie);
-      if (!movieFound) {
-        throw new Error("Movie not found");
-      }
-
-      // Encontra a sessão pelo id
-      const session = await Session.findById(movie);
-      if (!session) {
-        throw new Error("Session not found");
-      }
-
-      // Preenche a sala com o filme
-      cinema.rooms[roomIndex].movie = movie;
-      return await save(cinema);
-    }
-    catch (err) {
-      if (err.message === "Cinema not found" || err.message === "Room not found" || err.message === "Room already occupied" || err.message === "Movie not found" || err.message === "Session not found") {
-        throw err;
-      }
-      throw new Error("Erro ao preencher sala");
-    }
-    
-  }
-  */
 
   // Remove uma sala de um cinema
   async function removeRoom(id, room) {

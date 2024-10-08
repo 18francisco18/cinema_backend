@@ -10,7 +10,6 @@ const cinemaController = {
     findCinemaRoomsById,
     removeCinemaRoomById,
     removeCinemaById,
-    //fillRoom,
     addMovieToRoom,
     removeMovieFromRoom,
     addMoviesToBillboard,
@@ -136,28 +135,6 @@ async function removeCinemaById(req, res) {
         }
     }
 }
-
-/*
-async function fillRoom(req, res) {
-    try {
-        const { id, room, movie } = req.params;
-        const cinema = await cinemaService.fillRoom(id, room, movie);
-        if (!cinema) {
-            res.status(404).json({ error: "Cinema not found" });
-        } else {
-            res.status(200).json(cinema);
-            console.log("Room filled with movie");
-        }
-    } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
-    }
-}
-*/
 
 async function addMovieToRoom(req, res) {
     try {

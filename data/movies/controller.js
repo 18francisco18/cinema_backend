@@ -1,5 +1,5 @@
 const movieService = require("../movies"); // O serviço que lida com a requisição à OMDb API
-const movieModel = require("../movies"); // O modelo de filme
+const movieModel = require("./movies"); // O modelo de filme
 
 const movieController = {
   searchMovie,
