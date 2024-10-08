@@ -1,6 +1,3 @@
-const axios = require("axios");
-const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
-//Variável da rooms
 const RoomModel = require("../rooms");
 const Room = require("../rooms/rooms");
 const Session = require("./sessions");
@@ -10,13 +7,9 @@ function sessionService(sessionModel) {
   let service = {
     create,
     findAll,
+    deleteSession,
+    findSessionById,
     checkAvailability,
-    confirmPayment,
-    cancelPayment,
-    showSeatsAvailable,
-    occupySeat,
-    confirmSeat,
-    releaseSeat,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -83,6 +76,40 @@ function sessionService(sessionModel) {
     }
   }
 
+  async function findAll() {
+    try {
+      let sessions = await sessionModel.find();
+      return sessions;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error finding all sessions: ${error.message}`);
+    }
+  }
+
+  async function deleteSession(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      if (!session) {
+        throw new Error("Session not found");
+      }
+      await sessionModel.findByIdAndDelete(sessionId);
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error deleting session: ${error.message}`);
+    }
+  }
+
+
+  async function findSessionById(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      return session;
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error finding session by id: ${error.message}`);
+    }
+  }
+
   
   async function checkAvailability(sessionId) {
     try {
@@ -98,99 +125,6 @@ function sessionService(sessionModel) {
     }
   }
 
-  async function confirmPayment(sessionId) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let updatedSession = session;
-      updatedSession = await sessionModel.findByIdAndUpdate(
-        sessionId,
-        { paymentConfirmed: true },
-        { new: true }
-      );
-      return updatedSession;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error confirming payment: ${error.message}`);
-    }
-  }
-
-  async function cancelPayment(sessionId) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let updatedSession = session;
-      updatedSession = await sessionModel.findByIdAndUpdate(
-        sessionId,
-        { paymentConfirmed: false },
-        { new: true }
-      );
-      return updatedSession;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error cancelling payment: ${error.message}`);
-    }
-  }
-
-  async function showSeatsAvailable(sessionId) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let room = await RoomModel.findById(session.room);
-      let tickets = await sessionModel.findById(sessionId).populate("tickets");
-
-      let availableSeats = room.seats - tickets.length;
-      return availableSeats;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error showing available seats: ${error.message}`);
-    }
-  }
-
-  async function occupySeat(sessionId, seat) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let updatedSession = session;
-      updatedSession = await sessionModel.findByIdAndUpdate(
-        sessionId,
-        { $push: { occupiedSeats: seat } },
-        { new: true }
-      );
-      return updatedSession;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error occupying seat: ${error.message}`);
-    }
-  }
-
-  async function confirmSeat(sessionId, seat) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let updatedSession = session;
-      updatedSession = await sessionModel.findByIdAndUpdate(
-        sessionId,
-        { $push: { confirmedSeats: seat } },
-        { new: true }
-      );
-      return updatedSession;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error confirming seat: ${error.message}`);
-    }
-  }
-
-  async function releaseSeat(sessionId, seat) {
-    try {
-      let session = await sessionModel.findById(sessionId);
-      let updatedSession = session;
-      updatedSession = await sessionModel.findByIdAndUpdate(
-        sessionId,
-        { $pull: { confirmedSeats: seat } },
-        { new: true }
-      );
-      return updatedSession;
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error releasing seat: ${error.message}`);
-    }
-  }
 
   return service;
 }
