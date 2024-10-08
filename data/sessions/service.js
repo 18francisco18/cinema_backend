@@ -10,6 +10,7 @@ function sessionService(sessionModel) {
     deleteSession,
     findSessionById,
     checkAvailability,
+    checkAndUpdateSessions,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -17,14 +18,7 @@ function sessionService(sessionModel) {
   // dos ids de Room e Movie e garantir a cópia dos assentos de uma sala antes de criar a Session.
   // Não só serve para garantir a integridade dos dados e evitar erros de referência, como também
   // aplicar mais facilmente restrições no processo de criação.
-  async function create(
-    roomId,
-    movieId,
-    date,
-    price,
-    startTime,
-    endTime
-  ) {
+  async function create(roomId, movieId, date, price, startTime, endTime) {
     try {
       // Buscar o layout da Room pelo ID
       const room = await Room.findById(roomId);
@@ -38,7 +32,7 @@ function sessionService(sessionModel) {
       }
 
       // Acessar o layout de assentos da Room e mapear para a Session
-      // Para cada objeto "row", mapear cada objeto "seat" e retornar 
+      // Para cada objeto "row", mapear cada objeto "seat" e retornar
       // um objeto com o número do assento e o estado inicial
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
@@ -99,7 +93,6 @@ function sessionService(sessionModel) {
     }
   }
 
-
   async function findSessionById(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
@@ -110,7 +103,6 @@ function sessionService(sessionModel) {
     }
   }
 
-  
   async function checkAvailability(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
@@ -125,6 +117,44 @@ function sessionService(sessionModel) {
     }
   }
 
+  // Função para verificar e encerrar sessões automaticamente
+  // ATENÇÃO: Esta função deve ser chamada periodicamente para verificar e atualizar as sessões
+  // para tal, será utilizado o node-cron para agendar a execução desta função!
+  // A utilização do node-cron deverá ser feita no inicializador da aplicação (app.js) para ser
+  // executado automáticamente em intervalos regulares!
+  // Para mais informação de node-cron, consultar documentação 
+  // em https://www.npmjs.com/package/node-cron
+  async function checkAndUpdateSessions() {
+    try {
+      // Obter a data e hora atuais
+      const currentTime = new Date();
+
+      // Atualiza sessões finalizadas
+      await Session.updateMany(
+        // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ($ne - not equal)
+        // então atualiza o status para "finished" ($set - set field)
+        { endTime: { $lt: currentTime }, status: { $ne: "finished" } },
+        { $set: { status: "finished" } }
+      );
+
+      // Atualiza sessões em progresso
+      // Se startTime for menor que a hora atual ($lt - lesser than) e endTime for maior que a hora atual ($gt - greater than)
+      // e status igual a "available", então atualiza o status para "in progress" ($set - set field)
+      await Session.updateMany(
+        {
+          startTime: { $lt: currentTime },
+          endTime: { $gt: currentTime },
+          status: "available",
+        },
+        { $set: { status: "in progress" } }
+      );
+
+      console.log("Sessões atualizadas com sucesso");
+    } catch (error) {
+      console.error("Erro ao atualizar sessões", error);
+      throw new Error("Erro ao verificar e atualizar sessões");
+    }
+  }
 
   return service;
 }

@@ -1,6 +1,8 @@
 const express = require("express");
 const http = require("http");
 const mongoose = require("mongoose");
+const cron = require("node-cron");
+const sessionService = require("./data/sessions");
 
 const config = require("./config");
 
@@ -17,6 +19,13 @@ var app = express();
 app.use(express.json()); 
 app.use(router.init());
 
+// Cron job que verifica e atualiza estados das sessões a cada 5 minutos
+// ATENÇÃO: A razão do uso do node-cron é explicada no arquivo service.js de sessions,
+// na função checkAndUpdateSessions().  
+cron.schedule('*/5 * * * *', () => {
+  console.log('Verificando e atualizando sessões...');
+  sessionService.checkAndUpdateSessions();
+});
 
 const server = http.Server(app);
 
