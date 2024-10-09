@@ -9,6 +9,7 @@ function SessionsRouter() {
     router.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
 
     router.post('/create', sessionsController.createSession);
+    router.put('/:id/cancelSession', sessionsController.cancelSession);
 
     return router;
 }

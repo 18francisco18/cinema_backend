@@ -27,6 +27,11 @@ cron.schedule('*/5 * * * *', () => {
   sessionService.checkAndUpdateSessions();
 });
 
+cron.schedule('*/5 * * * *', () => {
+  console.log('Verificando por sessões expiradas...');
+  sessionService.deleteSessions();
+});
+
 const server = http.Server(app);
 
 server.listen(port, hostname, () => {

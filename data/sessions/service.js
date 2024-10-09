@@ -11,6 +11,8 @@ function sessionService(sessionModel) {
     findSessionById,
     checkAvailability,
     checkAndUpdateSessions,
+    cancelSession,
+    deleteSessions,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -36,7 +38,7 @@ function sessionService(sessionModel) {
       // um objeto com o número do assento e o estado inicial
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
-          seatNumber: seat.number,
+          seat: seat.number,
           status: "available", // Define o estado inicial como 'available'
         }));
       });
@@ -103,6 +105,81 @@ function sessionService(sessionModel) {
     }
   }
 
+
+  // Função para cancelar uma sessão manualmente. A razão para existir um método de cancelamento
+  // manual é para permitir que o administrador do sistema possa cancelar uma sessão 
+  // por qualquer motivo que não seja a falta de vendas (irá ser feito método automático para tal).
+  async function cancelSession(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      if (!session) {
+        throw new Error("Session not found");
+      }
+
+      const currentTime = new Date();
+
+      // Calcular o tempo de início da sessão e o tempo limite (1 hora antes do início)
+      const startTime = session.startTime;
+      const oneHourBeforeStart = new Date(startTime.getTime() - 60 * 60 * 1000); // 1 hora antes do startTime
+
+
+      if (session.status === "cancelled") {
+        throw new Error("Session already cancelled");
+      }
+
+      if (session.status === "finished") {
+        throw new Error("Session already finished");
+      }
+
+      // Verificar se a sessão pode ser cancelada
+      if (currentTime > oneHourBeforeStart) {
+        throw new Error(
+          "Cannot cancel the session less than 1 hour before the start time."
+        );
+      }
+
+      await sessionModel.findByIdAndUpdate(sessionId, { status: "cancelled" });
+    }
+    catch (error) {
+      console.log(error);
+
+      if (error.message === "Session not found") {
+        throw new Error("Session not found");
+      }
+
+      if (error.message === "Cannot cancel the session less than 1 hour before the start time.") {
+        throw new Error("Cannot cancel the session less than 1 hour before the start time.");
+      }
+
+      if (error.message === "Session already cancelled") {
+        throw new Error("Session already cancelled");
+      }
+
+      if (error.message === "Session already finished") {
+        throw new Error("Session already finished");
+      }
+
+      throw new Error(`Error cancelling session: ${error.message}`);
+    }
+  }
+
+  // Função para eliminar todas as sessões terminadas ou canceladas que já terminaram 
+  // uma hora depois de endTime.
+  // Utilizado node-cron para agendar a execução desta função a cada 5 minutos.
+  async function deleteSessions() {
+    try {
+      const currentTime = new Date();
+      await Session.deleteMany({
+        endTime: { $lt: new Date(currentTime.getTime() - 60 * 60 * 1000) }, // 1 hora atrás
+        status: { $in: ["finished", "cancelled"] },
+      });
+    } catch (error) {
+      console.log(error);
+      throw new Error(`Error deleting all sessions: ${error.message}`);
+    }
+  }
+
+
   async function checkAvailability(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
@@ -131,20 +208,22 @@ function sessionService(sessionModel) {
 
       // Atualiza sessões finalizadas
       await Session.updateMany(
-        // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ($ne - not equal)
+        // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ou "cancelled" ($nin - not in)
         // então atualiza o status para "finished" ($set - set field)
-        { endTime: { $lt: currentTime }, status: { $ne: "finished" } },
+        { endTime: { $lt: currentTime }, status: { $nin: ["finished", "cancelled"] } },
         { $set: { status: "finished" } }
       );
 
       // Atualiza sessões em progresso
       // Se startTime for menor que a hora atual ($lt - lesser than) e endTime for maior que a hora atual ($gt - greater than)
-      // e status igual a "available", então atualiza o status para "in progress" ($set - set field)
+      // e status apenas for igual a "available" ou "in progress" e não for igual a "cancelled",
+      // então atualiza o status para "in progress" ($set - set field)
       await Session.updateMany(
         {
           startTime: { $lt: currentTime },
           endTime: { $gt: currentTime },
-          status: "available",
+          status: { $in: ["available", "in progress"] },
+          status: { $nin: ["cancelled"] },
         },
         { $set: { status: "in progress" } }
       );

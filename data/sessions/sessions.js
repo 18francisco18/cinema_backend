@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const seatStatusSchema = new Schema({
-  seat: { type: Schema.Types.ObjectId, ref: "Room.seats" }, 
+  seat: { type: String, required: true },
   status: {
     type: String,
     enum: ["available", "reserved", "occupied", "inaccessible"],
-    default: "available", 
+    default: "available",
   },
 });
 
