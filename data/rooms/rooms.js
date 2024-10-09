@@ -1,12 +1,13 @@
 let mongoose = require("mongoose");
 let Schema = mongoose.Schema;
+let seatStatus = require("./seatStatus");
 
 const seatSchema = new Schema({
   number: { type: String, required: true, unique: true },
   status: {
     type: String,
-    enum: ["in condition", "inaccessible"],
-    default: "in condition",
+    enum: [seatStatus.inCondition, seatStatus.inaccessible],
+    default: seatStatus.inCondition,
   },
 });
 

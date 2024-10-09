@@ -1,12 +1,14 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
+const seatStatus = require('./seatStatus');
+const sessionStatus = require('./sessionStatus');
 
 const seatStatusSchema = new Schema({
   seat: { type: String, required: true },
   status: {
     type: String,
-    enum: ["available", "reserved", "occupied", "inaccessible"],
-    default: "available",
+    enum: [seatStatus.available, seatStatus.reserved, seatStatus.occupied, seatStatus.inaccessible],
+    default: seatStatus.available,
   },
 });
 
@@ -19,8 +21,8 @@ const sessionSchema = new Schema({
   endTime: { type: Date, required: true },
   status: {
     type: String,
-    enum: ["available", "sold out", "cancelled", "in progress", "finished"],
-    default: "available",
+    enum: [sessionStatus.available, sessionStatus.cancelled, sessionStatus.finished, sessionStatus.inProgress, sessionStatus.soldOut],
+    default: sessionStatus.available,
   },
   seats: [[seatStatusSchema]],
 });

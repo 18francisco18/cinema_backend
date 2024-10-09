@@ -1,4 +1,5 @@
 const CinemaModel = require('../cinema');
+const seatStatus = require('./seatStatus');
 
 function RoomService(roomModel) {
     let service = {
@@ -101,46 +102,43 @@ function RoomService(roomModel) {
             if (!room) {
                 throw new Error("Room not found");
             }
-
-
+    
             // Verifica se o status do assento é válido
-            const validStatuses = ["in condition", "inaccessible"];
+            const validStatuses = [seatStatus.inCondition, seatStatus.inaccessible];
             if (!validStatuses.includes(seat.status)) {
-              throw new Error("Invalid seat status");
+                throw new Error("Invalid seat status");
             }
-
+    
             let seatFound = false;
-            
+    
             // Atualiza o status do assento
             room.layout.forEach((row, rowIndex) => {
                 row.forEach((currentSeat, seatIndex) => {
                     if (currentSeat.number === seat.number) {
                         room.layout[rowIndex][seatIndex].status = seat.status;
                         seatFound = true;
-                    } 
+                    }
                 });
             });
-
+    
             if (!seatFound) {
-              throw new Error("Invalid seat number");
+                throw new Error("Invalid seat number");
             }
-
+    
             await room.save();
-    }
-    catch (err) {
-        console.log(err);
-        if (err.message === "Room not found") {
-            throw err;
+        } catch (err) {
+            console.log(err);
+            if (err.message === "Room not found") {
+                throw err;
+            }
+            if (err.message === "Invalid seat status") {
+                throw new Error("Invalid seat status, either change to 'inCondition' or 'inaccessible'");
+            }
+            if (err.message === "Invalid seat number") {
+                throw new Error("Invalid seat number");
+            }
+            throw new Error("Error updating room");
         }
-        if (err.message === "Invalid seat status") {
-            throw new Error("Invalid seat status, either change to 'in condition' or 'inaccessible'");
-        }
-
-        if (err.message === "Invalid seat number") {
-            throw new Error("Invalid seat number");
-        }
-        throw new Error("Error updating room");
-    }
     }
 
     return service;

@@ -2,6 +2,8 @@ const RoomModel = require("../rooms");
 const Room = require("../rooms/rooms");
 const Session = require("./sessions");
 const Movie = require("../movies/movies");
+const seatStatus = require("./seatStatus");
+const sessionStatus = require("./sessionStatus");
 
 function sessionService(sessionModel) {
   let service = {
@@ -39,7 +41,7 @@ function sessionService(sessionModel) {
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
           seat: seat.number,
-          status: "available", // Define o estado inicial como 'available'
+          status: seatStatus.available, // Define o estado inicial como 'available'
         }));
       });
 
@@ -123,11 +125,11 @@ function sessionService(sessionModel) {
       const oneHourBeforeStart = new Date(startTime.getTime() - 60 * 60 * 1000); // 1 hora antes do startTime
 
 
-      if (session.status === "cancelled") {
+      if (session.status === sessionStatus.cancelled) {
         throw new Error("Session already cancelled");
       }
 
-      if (session.status === "finished") {
+      if (session.status === sessionStatus.finished) {
         throw new Error("Session already finished");
       }
 
@@ -138,7 +140,7 @@ function sessionService(sessionModel) {
         );
       }
 
-      await sessionModel.findByIdAndUpdate(sessionId, { status: "cancelled" });
+      await sessionModel.findByIdAndUpdate(sessionId, { status: sessionStatus.cancelled });
     }
     catch (error) {
       console.log(error);
@@ -171,14 +173,13 @@ function sessionService(sessionModel) {
       const currentTime = new Date();
       await Session.deleteMany({
         endTime: { $lt: new Date(currentTime.getTime() - 60 * 60 * 1000) }, // 1 hora atrás
-        status: { $in: ["finished", "cancelled"] },
+        status: { $in: [sessionStatus.finished, sessionStatus.cancelled] },
       });
     } catch (error) {
       console.log(error);
       throw new Error(`Error deleting all sessions: ${error.message}`);
     }
   }
-
 
   async function checkAvailability(sessionId) {
     try {
@@ -210,8 +211,8 @@ function sessionService(sessionModel) {
       await Session.updateMany(
         // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ou "cancelled" ($nin - not in)
         // então atualiza o status para "finished" ($set - set field)
-        { endTime: { $lt: currentTime }, status: { $nin: ["finished", "cancelled"] } },
-        { $set: { status: "finished" } }
+        { endTime: { $lt: currentTime }, status: { $nin: [sessionStatus.finished, sessionStatus.cancelled] } },
+        { $set: { status: sessionStatus.finished } }
       );
 
       // Atualiza sessões em progresso
@@ -222,10 +223,10 @@ function sessionService(sessionModel) {
         {
           startTime: { $lt: currentTime },
           endTime: { $gt: currentTime },
-          status: { $in: ["available", "in progress"] },
-          status: { $nin: ["cancelled"] },
+          status: { $in: [sessionStatus.available, sessionStatus.inProgress] },
+          status: { $nin: [sessionStatus.cancelled] },
         },
-        { $set: { status: "in progress" } }
+        { $set: { status: sessionStatus.inProgress } }
       );
 
       console.log("Sessões atualizadas com sucesso");
