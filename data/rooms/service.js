@@ -7,13 +7,14 @@ function RoomService(roomModel) {
         findAll,
         removeById,
         updateById,
+        updateSeatStatus,
     };
 
     // Cria uma nova sala
     async function create(room) {
         try {
             let newRoom = new roomModel(room);
-            let savedRoom = await newRoom.save();
+            let savedRoom = await newRoom.save({functionName: 'create'});
 
             await CinemaModel.findByIdAndUpdate(
                 room.cinema,
@@ -92,6 +93,54 @@ function RoomService(roomModel) {
             }
             throw new Error("Error updating room");
         }
+    }
+
+    async function updateSeatStatus(id, seat) {
+        try {
+            const room = await roomModel.findById(id);
+            if (!room) {
+                throw new Error("Room not found");
+            }
+
+
+            // Verifica se o status do assento é válido
+            const validStatuses = ["in condition", "inaccessible"];
+            if (!validStatuses.includes(seat.status)) {
+              throw new Error("Invalid seat status");
+            }
+
+            let seatFound = false;
+            
+            // Atualiza o status do assento
+            room.layout.forEach((row, rowIndex) => {
+                row.forEach((currentSeat, seatIndex) => {
+                    if (currentSeat.number === seat.number) {
+                        room.layout[rowIndex][seatIndex].status = seat.status;
+                        seatFound = true;
+                    } 
+                });
+            });
+
+            if (!seatFound) {
+              throw new Error("Invalid seat number");
+            }
+
+            await room.save();
+    }
+    catch (err) {
+        console.log(err);
+        if (err.message === "Room not found") {
+            throw err;
+        }
+        if (err.message === "Invalid seat status") {
+            throw new Error("Invalid seat status, either change to 'in condition' or 'inaccessible'");
+        }
+
+        if (err.message === "Invalid seat number") {
+            throw new Error("Invalid seat number");
+        }
+        throw new Error("Error updating room");
+    }
     }
 
     return service;

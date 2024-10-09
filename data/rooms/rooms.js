@@ -2,7 +2,12 @@ let mongoose = require("mongoose");
 let Schema = mongoose.Schema;
 
 const seatSchema = new Schema({
-  number: { type: String, required: true }, 
+  number: { type: String, required: true, unique: true },
+  status: {
+    type: String,
+    enum: ["in condition", "inaccessible"],
+    default: "in condition",
+  },
 });
 
 let roomSchema = new Schema({
@@ -13,10 +18,14 @@ let roomSchema = new Schema({
 });
 
 roomSchema.pre("save", function (next) {
+
+
+
   const room = this;
   // Calcula o total de assentos no layout. O .reduce é um método de array que acumula um valor a partir
   //de todos os elementos do array. dentro da função de callback, o primeiro argumento é o valor acumulado
   //e o segundo é o array atual. O 0 no final é o valor inicial do acumulador.
+  if (room.isNew) { 
   const seatCount = room.layout.reduce((total, row) => total + row.length, 0);
 
   if (seatCount !== room.capacity) {
@@ -32,6 +41,8 @@ roomSchema.pre("save", function (next) {
       )
     );
   }
+}
+
 
   // Se estiver tudo certo, continua com o save na base de dados.
   next();
@@ -40,7 +51,9 @@ roomSchema.pre("save", function (next) {
 
 // Middleware 'pre' para validar a unicidade do nome da sala dentro do cinema
 roomSchema.pre("save", async function (next) {
+
   const room = this;
+  if (room.isNew) {
 
   try {
     // Verifica se já existe uma sala com o mesmo nome no mesmo cinema
@@ -65,6 +78,7 @@ roomSchema.pre("save", async function (next) {
   } catch (error) {
     next(error); // Se houver algum erro na verificação, também passa o erro
   }
+}
 });
 
 

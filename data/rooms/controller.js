@@ -7,6 +7,7 @@ const roomController = {
   getAllRooms,
   removeRoomById,
   updateRoomById,
+  updateSeatStatus,
 };
 
 async function createRoom(req, res) {
@@ -80,6 +81,30 @@ async function updateRoomById(req, res) {
       // Caso o problema seja algo que não seja o id não encontrado, transmite o erro 500.
       res.status(500).json({ error: "Internal Server Error" });
     }
+  }
+}
+
+async function updateSeatStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const seat = req.body;
+    const updatedRoom = await roomService.updateSeatStatus(id, seat);
+    res.status(200).send(updatedRoom);
+  } catch(error) {
+    if (error.message === "Room not found") {
+      res.status(404).json({ error: "Room not found" });
+    } 
+
+    if (error.message === "Invalid seat status") {
+      res.status(404).json({ error: "Invalid seat status" });
+    } 
+
+    if (error.message === "Invalid seat number") {
+      res.status(404).json({ error: "Invalid seat number" });
+    } 
+
+    res.status(500).json({ error: "Internal Server Error" });
+
   }
 }
 
