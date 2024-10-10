@@ -10,6 +10,11 @@ function SessionsRouter() {
 
     router.post('/create', sessionsController.createSession);
     router.put('/:id/cancelSession', sessionsController.cancelSession);
+    router.get('/', sessionsController.getSessions);
+    router.get('/:id', sessionsController.getSessionById);
+    router.delete('/:id', sessionsController.deleteSession);
+    router.post('/checkAvailability', sessionsController.checkAvailability);
+    router.put('/:id/applyUnavailability', sessionsController.applyUnavaliabilityToSeats);
 
     return router;
 }
