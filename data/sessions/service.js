@@ -10,11 +10,12 @@ function sessionService(sessionModel) {
     create,
     findAll,
     deleteSession,
-    findSessionById,
+    findById,
     checkAvailability,
     checkAndUpdateSessions,
     cancelSession,
     deleteSessions,
+    applyUnavaliabilityToSeats,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -41,7 +42,9 @@ function sessionService(sessionModel) {
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
           seat: seat.number,
-          status: seatStatus.available, // Define o estado inicial como 'available'
+          status: seat.status === seatStatus.inaccessible // Se o assento da sala for inacessível
+            ? seatStatus.inaccessible // Assentos inacessíveis da sala são refletidos na sessão
+            : seatStatus.available // Assentos disponíveis começam como 'available'
         }));
       });
 
@@ -97,7 +100,7 @@ function sessionService(sessionModel) {
     }
   }
 
-  async function findSessionById(sessionId) {
+  async function findById(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
       return session;
@@ -234,6 +237,45 @@ function sessionService(sessionModel) {
       console.error("Erro ao atualizar sessões", error);
       throw new Error("Erro ao verificar e atualizar sessões");
     }
+  }
+
+  // Função para aplicar indisponibilidade a assentos específicos de uma sessão
+  async function applyUnavaliabilityToSeats(sessionId, seatNumbers) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      if (!session) {
+        throw new Error("Session not found");
+      }
+
+      // Obter o layout de assentos da sessão
+      const seatLayout = session.seats;
+
+      // Para cada número de assento fornecido, encontrar o assento correspondente
+      // e definir o status como "inaccessible"
+      session.seats.forEach((seatNumber) => {
+        // Percorrer o layout de assentos e encontrar o assento correspondente
+        for (let i = 0; i < seatLayout.length; i++) {
+          for (let j = 0; j < seatLayout[i].length; j++) {
+            if (seatLayout[i][j].seat === seatNumber) {
+              // Definir o status do assento como "inaccessible"
+              seatLayout[i][j].status = seatStatus.inaccessible;
+            }
+          }
+        }
+      });
+
+      // Atualizar o layout de assentos da sessão
+      await sessionModel.findByIdAndUpdate(sessionId, { seats: seatLayout });
+    }
+    catch (error) {
+      console.log(error);
+
+      if (error.message === "Session not found") {
+        throw new Error("Session not found");
+      }
+
+      throw new Error(`Error applying unavailability to seats: ${error.message}`);
+    } 
   }
 
   return service;
