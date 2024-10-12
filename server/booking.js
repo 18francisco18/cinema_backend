@@ -8,7 +8,7 @@ function BookingRouter() {
     router.use(bodyParser.json({ limit: "100mb" }));
     router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-    router.post("/create", bookingController.createBooking);
+    router.post("/:id/create", bookingController.createBooking);
     router.get("/find/:id", bookingController.getBookingById);
     router.get("/findAll", bookingController.getAllBookings);
     router.delete("/remove/:id", bookingController.removeBookingById);

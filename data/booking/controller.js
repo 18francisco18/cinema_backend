@@ -13,7 +13,8 @@ const bookingController = {
 async function createBooking(req, res) {
     try {
         const booking = req.body;
-        const newBooking = await bookingService.create(booking);
+        const { id } = req.params;
+        const newBooking = await bookingService.create(booking, id);
         res.status(201).send(newBooking);
     } catch (error) {
         if (error.message === "Check for missing fields or wrong fields") {
