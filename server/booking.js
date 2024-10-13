@@ -1,20 +1,62 @@
 const bodyParser = require("body-parser");
 const express = require("express");
 const bookingController = require("../data/booking/controller");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 function BookingRouter() {
-    let router = express();
+  let router = express();
 
-    router.use(bodyParser.json({ limit: "100mb" }));
-    router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
+  // Rota do webhook do Stripe, com o middleware específico primeiro
+  router.post(
+    "/webhook",
+    bodyParser.raw({ type: "application/json" }),
+    async (req, res) => {
+      const sig = req.headers["stripe-signature"];
+      let event;
 
-    router.post("/:id/create", bookingController.createBooking);
-    router.get("/find/:id", bookingController.getBookingById);
-    router.get("/findAll", bookingController.getAllBookings);
-    router.delete("/remove/:id", bookingController.removeBookingById);
-    router.put("/update/:id", bookingController.updateBookingById);
+      try {
+        // Verificar a assinatura e decodificar o evento enviado pelo Stripe
+        event = stripe.webhooks.constructEvent(
+          req.body,
+          sig,
+          process.env.STRIPE_WEBHOOK_SECRET
+        );
+      } catch (err) {
+        console.error("Erro ao verificar assinatura do webhook:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
 
-    return router;
+      // Manipular o evento de acordo com o tipo
+      switch (event.type) {
+        case "payment_intent.succeeded":
+          const paymentIntent = event.data.object;
+          // Chame a função para lidar com a confirmação de pagamento
+          await bookingController.handlePaymentConfirmation(
+            paymentIntent.id
+          );
+          console.log("Pagamento confirmado para:", paymentIntent.id);
+          break;
+        default:
+          console.warn(`Evento não tratado: ${event.type}`);
+      }
+
+      // Retornar uma resposta para confirmar o recebimento do evento
+      res.json({ received: true });
+    }
+  );
+
+  // Outros middlewares gerais para as demais rotas
+  router.use(bodyParser.json({ limit: "100mb" }));
+  router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
+
+  // Outras rotas normais
+  router.post("/:id/create", bookingController.createBooking);
+  router.get("/find/:id", bookingController.getBookingById);
+  router.get("/findAll", bookingController.getAllBookings);
+  router.delete("/remove/:id", bookingController.removeBookingById);
+  router.put("/update/:id", bookingController.updateBookingById);
+
+  return router;
 }
 
 module.exports = BookingRouter;

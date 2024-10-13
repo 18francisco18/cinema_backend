@@ -16,7 +16,7 @@ mongoose
 
 let router = require("./router");
 var app = express();
-app.use(express.json()); 
+//app.use(express.json()); 
 app.use(router.init());
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos

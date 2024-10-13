@@ -6,6 +6,7 @@ const bookingController = {
     getAllBookings,
     removeBookingById,
     updateBookingById,
+    handlePaymentConfirmation,
 
 }
 
@@ -76,6 +77,14 @@ async function updateBookingById(req, res) {
         } else {
             res.status(500).json({ error: "Internal Server Error" });
         }
+    }
+}
+
+async function handlePaymentConfirmation(sessionId) {
+    try {
+        await bookingService.handlePaymentConfirmation(sessionId);
+    } catch (error) {
+        console.error("Erro ao confirmar pagamento:", error.message);
     }
 }
 
