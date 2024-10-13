@@ -128,10 +128,10 @@ function bookingService(bookingModel) {
 
      
      
-      const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
+      //const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
       // Retornar a reserva.
-      return { booking: savedBooking, paymentUrl: paymentConfirmation.url };
+      return { booking: savedBooking/*, paymentUrl: paymentConfirmation.url*/ };
     } catch (error) {
       console.log(error);
 
@@ -164,7 +164,7 @@ function bookingService(bookingModel) {
   }
 
 
-  async function handlePaymentConfirmation(paymentIntentId) {
+  /*async function handlePaymentConfirmation(paymentIntentId) {
     try {
       // Buscar a sessão de pagamento no Stripe usando o sessionId
       const paymentIntent = await stripe.paymentIntents.retrieve(
@@ -234,9 +234,6 @@ function bookingService(bookingModel) {
     }
   }
 
-
-
-
   // Função para criar o pagamento de uma reserva
   async function createPaymentSession(booking) {
     try {
@@ -279,14 +276,7 @@ function bookingService(bookingModel) {
       console.error("Error creating payment session:", error);
       throw new Error("Failed to create payment session");
     }
-  }
-
-
-
-
-
-
-
+  }*/
 
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
@@ -302,10 +292,6 @@ function bookingService(bookingModel) {
           ],
         })
         .exec();
-
-
-
-
 
       // Dados que serão codificados no QR Code
       const qrData = {
