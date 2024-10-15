@@ -29,7 +29,7 @@ function bookingService(bookingModel) {
     findAll,
     removeById,
     updateById,
-    handlePaymentConfirmation,
+    
   };
 
   async function create(booking, sessionId) {
@@ -395,40 +395,6 @@ function bookingService(bookingModel) {
     }
   }
 
-  // Função para reservar assentos em uma sessão
-  async function bookSession(sessionId, seats, userId) {
-    try {
-      // Verificar se a sessão existe
-      let session = await sessionModel.findById(sessionId);
-      if (!session) {
-        throw new Error("Session not found");
-      }
-
-      // Verificar tickets presentes na sessão
-      let tickets = await sessionModel.findById(sessionId).populate("tickets");
-
-      let availableSeats = room.seats - tickets.length;
-      if (availableSeats < seats) {
-        throw new Error("Not enough seats available");
-      }
-
-      let user = await userModel.findById(userId);
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      let newBooking = new bookingModel({
-        session: session,
-        user: user,
-        seats: seats,
-      });
-
-      return await save(newBooking);
-    } catch (error) {
-      console.log(error);
-      throw new Error(`Error booking session: ${error.message}`);
-    }
-  }
 
   return service;
 }
