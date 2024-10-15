@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
+const CORS = require("cors");
 const sessionService = require("./data/sessions");
 
 const config = require("./config");
@@ -16,7 +17,12 @@ mongoose
 
 let router = require("./router");
 var app = express();
-app.use(express.json()); 
+app.use(CORS({
+  origin: 'http://localhost:4000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+//app.use(express.json()); 
 app.use(router.init());
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos

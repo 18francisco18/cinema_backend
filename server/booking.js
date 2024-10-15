@@ -7,7 +7,7 @@ function BookingRouter() {
   let router = express();
 
   // Rota do webhook do Stripe, com o middleware específico primeiro
-  /*router.post(
+  router.post(
     "/webhook",
     bodyParser.raw({ type: "application/json" }),
     async (req, res) => {
@@ -32,7 +32,7 @@ function BookingRouter() {
           const paymentIntent = event.data.object;
           // Chame a função para lidar com a confirmação de pagamento
           await bookingController.handlePaymentConfirmation(
-            paymentIntent.id
+            paymentIntent
           );
           console.log("Pagamento confirmado para:", paymentIntent.id);
           break;
@@ -43,7 +43,7 @@ function BookingRouter() {
       // Retornar uma resposta para confirmar o recebimento do evento
       res.json({ received: true });
     }
-  );*/
+  );
 
   // Outros middlewares gerais para as demais rotas
   router.use(bodyParser.json({ limit: "100mb" }));

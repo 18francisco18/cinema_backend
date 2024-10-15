@@ -80,9 +80,9 @@ async function updateBookingById(req, res) {
     }
 }
 
-async function handlePaymentConfirmation(sessionId) {
+async function handlePaymentConfirmation(paymentIntentId) {
     try {
-        await bookingService.handlePaymentConfirmation(sessionId);
+        await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {
         console.error("Erro ao confirmar pagamento:", error.message);
     }
