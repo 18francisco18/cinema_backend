@@ -6,8 +6,7 @@ const bookingController = {
     getAllBookings,
     removeBookingById,
     updateBookingById,
-    handlePaymentConfirmation,
-
+    handlePaymentConfirmation
 }
 
 
@@ -87,6 +86,7 @@ async function handlePaymentConfirmation(paymentIntentId) {
         console.error("Erro ao confirmar pagamento:", error.message);
     }
 }
+
 
 
 
