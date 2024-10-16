@@ -11,16 +11,13 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 dotenv.config();
 
-
 const transporter = nodeMailer.createTransport({
   service: "outlook",
   auth: {
     user: process.env.EMAIL_ADDRESS,
-    pass: process.env.EMAIL_PASSWORD, 
+    pass: process.env.EMAIL_PASSWORD,
   },
 });
-
-
 
 function bookingService(bookingModel) {
   let service = {
@@ -29,14 +26,13 @@ function bookingService(bookingModel) {
     findAll,
     removeById,
     updateById,
-    handlePaymentConfirmation
+    handlePaymentConfirmation,
   };
 
   async function create(booking, sessionId) {
     try {
       // Buscar a sessão associada à reserva.
       const session = await sessionModel.findById(sessionId);
-   
 
       // Caso a sessão não exista, lançar um erro.
       if (!session) {
@@ -72,7 +68,7 @@ function bookingService(bookingModel) {
       // se o assento existe na sessão. No fim, irá retornar os assentos que não existem
       // ou que não estão disponíveis.
       const invalidSeats = booking.seats.filter((seat) => {
-        const sessionSeat = sessionSeats.find((s) => s.seat    === seat);
+        const sessionSeat = sessionSeats.find((s) => s.seat === seat);
         return !sessionSeat || sessionSeat.status !== seatStatus.available;
       });
 
@@ -97,7 +93,7 @@ function bookingService(bookingModel) {
         paymentStatus: "pending",
       });
 
-       const savedBooking = await save(newBooking); // Salvar a reserva no banco de dados.
+      const savedBooking = await save(newBooking); // Salvar a reserva no banco de dados.
 
       // Atualizar o status dos assentos reservados para "reservado".
       // Ao buscar os assentos da sessão, é feito um mapeamento para verificar dentro de cada
@@ -127,7 +123,7 @@ function bookingService(bookingModel) {
       await session.save(); // Salvar a sessão com os assentos atualizados.
 
       console.log("Session updated with reserved seats");
-     
+
       const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
       // Retornar a reserva.
@@ -155,14 +151,15 @@ function bookingService(bookingModel) {
         throw new Error("Cannot book a session in the past");
       }
 
-      if (error.message.includes("The following seats are invalid or unavailable")) {
+      if (
+        error.message.includes("The following seats are invalid or unavailable")
+      ) {
         throw new Error(error.message);
       }
 
       throw new Error("Check for missing fields or wrong fields");
     }
   }
-
 
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
@@ -184,13 +181,11 @@ function bookingService(bookingModel) {
           console.log("Booking ID não encontrado nos metadados");
         }
 
-        
         // Buscar a reserva com o ID fornecido
         const booking = await bookingModel.findById(bookingId).populate("user");
         if (!booking) {
           throw new Error("Booking not found");
         }
-          
 
         // Atualizar o status de pagamento para "paid"
         booking.paymentStatus = "paid";
@@ -224,7 +219,6 @@ function bookingService(bookingModel) {
         await booking.save();
 
         return { message: "Payment confirmed, QR Code sent", booking };
-        
       } else {
         throw new Error("Payment not confirmed");
       }
@@ -240,7 +234,9 @@ function bookingService(bookingModel) {
     try {
       console.log("Booking:", booking);
       // Buscar a sessão associada à reserva para obter detalhes como preço.
-      const session = await sessionModel.findById(booking.session).populate("movie");
+      const session = await sessionModel
+        .findById(booking.session)
+        .populate("movie");
       if (!session) {
         throw new Error("Session not found");
       }
@@ -272,8 +268,10 @@ function bookingService(bookingModel) {
           roomId: booking.room._id.toString(), // Certifique-se de que o roomId é uma string
         },
       });
-      
-      const retrievedSession = await stripe.checkout.sessions.retrieve(paymentSession.id);
+
+      const retrievedSession = await stripe.checkout.sessions.retrieve(
+        paymentSession.id
+      );
       console.log("Checkout Session Metadata:", retrievedSession.metadata);
       console.log("Payment session created:", paymentSession.id);
       return { url: paymentSession.url };
@@ -286,14 +284,17 @@ function bookingService(bookingModel) {
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
     try {
-
       const populatedBooking = await bookingModel
         .findById(booking._id)
         .populate({
           path: "session",
           populate: [
             { path: "movie", select: "title" }, // Popula o nome do filme
-            { path: "room", select: "name", populate: { path: "cinema", select: "name" } }, // Popula o nome da sala e do cinema
+            {
+              path: "room",
+              select: "name",
+              populate: { path: "cinema", select: "name" },
+            }, // Popula o nome da sala e do cinema
           ],
         })
         .exec();
@@ -313,8 +314,7 @@ function bookingService(bookingModel) {
         qrStatus: populatedBooking.status,
       };
 
-       console.log("Dados do QR Code:", qrData);
-
+      console.log("Dados do QR Code:", qrData);
 
       // Gera o QR Code como uma string base64
       const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
@@ -323,7 +323,7 @@ function bookingService(bookingModel) {
     } catch (error) {
       console.error("Erro ao gerar QR Code:", error);
       throw new Error("Falha ao gerar o QR Code");
-    } 
+    }
   }
 
   // Salva um modelo
@@ -399,7 +399,6 @@ function bookingService(bookingModel) {
       throw new Error("Error updating booking");
     }
   }
-
 
   return service;
 }
