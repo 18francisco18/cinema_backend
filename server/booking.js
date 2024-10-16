@@ -28,14 +28,29 @@ function BookingRouter() {
 
       // Manipular o evento de acordo com o tipo
       switch (event.type) {
+        case "checkout.session.completed":
+          const session = event.data.object;
+
+          // Atualizar o paymentIntent com os metadados do checkout.session
+          await stripe.paymentIntents.update(session.payment_intent, {
+            metadata: {
+              bookingId: session.metadata.bookingId,
+              userId: session.metadata.userId,
+              sessionId: session.metadata.sessionId,
+              movieId: session.metadata.movieId,
+              roomId: session.metadata.roomId,
+            },
+          });
+
+          console.log("Metadados atualizados para o Payment Intent:", session.payment_intent);
+          break;
+
         case "payment_intent.succeeded":
           const paymentIntent = event.data.object;
-          // Chame a função para lidar com a confirmação de pagamento
-          await bookingController.handlePaymentConfirmation(
-            paymentIntent
-          );
           console.log("Pagamento confirmado para:", paymentIntent.id);
+          await bookingController.handlePaymentConfirmation(paymentIntent);
           break;
+          
         default:
           console.warn(`Evento não tratado: ${event.type}`);
       }

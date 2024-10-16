@@ -29,7 +29,7 @@ function bookingService(bookingModel) {
     findAll,
     removeById,
     updateById,
-    
+    handlePaymentConfirmation
   };
 
   async function create(booking, sessionId) {
@@ -126,7 +126,7 @@ function bookingService(bookingModel) {
 
       await session.save(); // Salvar a sessão com os assentos atualizados.
 
-     
+      console.log("Session updated with reserved seats");
      
       const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
@@ -236,7 +236,9 @@ function bookingService(bookingModel) {
 
   // Função para criar o pagamento de uma reserva
   async function createPaymentSession(booking) {
+    console.log("Creating payment session for booking");
     try {
+      console.log("Booking:", booking);
       // Buscar a sessão associada à reserva para obter detalhes como preço.
       const session = await sessionModel.findById(booking.session).populate("movie");
       if (!session) {
@@ -270,7 +272,10 @@ function bookingService(bookingModel) {
           roomId: booking.room._id.toString(), // Certifique-se de que o roomId é uma string
         },
       });
-
+      
+      const retrievedSession = await stripe.checkout.sessions.retrieve(paymentSession.id);
+      console.log("Checkout Session Metadata:", retrievedSession.metadata);
+      console.log("Payment session created:", paymentSession.id);
       return { url: paymentSession.url };
     } catch (error) {
       console.error("Error creating payment session:", error);
