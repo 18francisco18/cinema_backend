@@ -236,7 +236,13 @@ function bookingService(bookingModel) {
       // Buscar a sessão associada à reserva para obter detalhes como preço.
       const session = await sessionModel
         .findById(booking.session)
-        .populate("movie");
+        .populate("movie")
+        .populate({
+          path: "room",
+          populate: {
+            path: "cinema",
+          },
+        });
       if (!session) {
         throw new Error("Session not found");
       }
@@ -250,7 +256,12 @@ function bookingService(bookingModel) {
               currency: "eur", // Substitua pela moeda desejada (ex: eur, brl)
               product_data: {
                 name: `Movie Ticket for ${session.movie.title}`,
-                description: `Seats: ${booking.seats.join(", ")}`,
+                description: `
+                Seats: ${booking.seats.join(", ")}
+                Room: ${session.room.name}
+                Cinema: ${session.room.cinema.name}
+              `,
+                images: [session.movie.poster], // Supondo que a URL da imagem da capa do filme está em session.movie.poster
               },
               unit_amount: session.price * 100, // O Stripe lida com valores em centavos
             },
