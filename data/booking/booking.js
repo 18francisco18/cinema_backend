@@ -4,8 +4,6 @@ const Schema = mongoose.Schema;
 const bookingSchema = new Schema({
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     session: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
-    movie: { type: Schema.Types.ObjectId, ref: 'Movie', required: true }, // Referência direta ao filme
-    room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
     seats: [{ type: String, required: true }], // Lista de assentos reservados
     date: { type: Date, default: Date.now }, // Data de criação da reserva
     status: {
@@ -19,7 +17,6 @@ const bookingSchema = new Schema({
         enum: ["paid", "pending", "cancelled"],
         default: "pending"
     },
-    qrCode: { type: String }, // Código de verificação, opcional
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);

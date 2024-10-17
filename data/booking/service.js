@@ -1,13 +1,12 @@
 const sessionModel = require("../sessions/sessions");
-const RoomModel = require("../rooms/rooms");
-const bookingModel = require("./booking");
-const userModel = require("../users/user");
+const ticketModel = require("../tickets/tickets");
 const QRCode = require("qrcode");
 const seatStatus = require("../sessions/seatStatus");
 const sessionStatus = require("../sessions/sessionStatus");
 const nodeMailer = require("nodemailer");
 const dotenv = require("dotenv");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 dotenv.config();
 
@@ -123,6 +122,15 @@ function bookingService(bookingModel) {
       await session.save(); // Salvar a sessão com os assentos atualizados.
 
       console.log("Session updated with reserved seats");
+
+      // Eliminar uma reserva caso o pagamento não seja confirmado em 5 minutos.
+      setTimeout(async () => {
+        let check = await bookingModel.findById(newBooking._id);
+        if (check && check.paymentStatus === "pending") {
+          await bookingModel.findByIdAndDelete(newBooking._id);
+        }
+      }, 5 * 60 * 1000);
+        
 
       const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
@@ -275,8 +283,8 @@ function bookingService(bookingModel) {
           bookingId: booking._id.toString(), // Certifique-se de que o bookingId é uma string
           userId: booking.user._id.toString(), // Certifique-se de que o userId é uma string
           sessionId: booking.session._id.toString(), // Certifique-se de que o sessionId é uma string
-          movieId: booking.movie._id.toString(), // Certifique-se de que o movieId é uma string
-          roomId: booking.room._id.toString(), // Certifique-se de que o roomId é uma string
+          movieId: session.movie._id.toString(), // Certifique-se de que o movieId é uma string
+          roomId: session.room._id.toString(), // Certifique-se de que o roomId é uma string
         },
       });
 
@@ -295,34 +303,47 @@ function bookingService(bookingModel) {
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
     try {
-      const populatedBooking = await bookingModel
-        .findById(booking._id)
+      // Buscar a reserva populada para obter os dados necessários
+      const populatedBooking = await bookingModel.findById(booking._id);
+
+      // Criar um novo bilhete associado à reserva
+      const newTicket = await ticketModel.create({
+        booking: populatedBooking._id,
+      });
+
+      // Popula o novo bilhete com os dados da reserva
+      const populatedTicket = await ticketModel
+        .findById(newTicket._id)
         .populate({
-          path: "session",
+          path: "booking",
           populate: [
-            { path: "movie", select: "title" }, // Popula o nome do filme
             {
-              path: "room",
-              select: "name",
-              populate: { path: "cinema", select: "name" },
-            }, // Popula o nome da sala e do cinema
+              path: "session",
+              populate: [
+                { path: "movie", select: "title" },
+                {
+                  path: "room",
+                  select: "name",
+                  populate: { path: "cinema", select: "name" },
+                },
+              ],
+            },
           ],
-        })
-        .exec();
+        });
 
       // Dados que serão codificados no QR Code
       const qrData = {
-        reservationId: populatedBooking._id,
-        userId: populatedBooking.user._id,
-        sessionId: populatedBooking.session._id,
-        movie: populatedBooking.session.movie._id,
-        room: populatedBooking.session.room._id,
-        cinema: populatedBooking.session.room.cinema._id,
-        seats: populatedBooking.seats,
-        startTime: populatedBooking.session.startTime,
-        totalAmount: populatedBooking.totalAmount,
-        printedTime: populatedBooking.date,
-        qrStatus: populatedBooking.status,
+        reservationId: populatedTicket._id,
+        reservationNumber: populatedTicket.ticketNumber,
+        userId: populatedTicket.booking.user._id,
+        sessionId: populatedTicket.booking.session._id,
+        movie: populatedTicket.booking.session.movie._id,
+        room: populatedTicket.booking.session.room._id,
+        cinema: populatedTicket.booking.session.room.cinema._id,
+        seats: populatedTicket.booking.seats,
+        startTime: populatedTicket.booking.session.startTime,
+        totalAmount: populatedTicket.booking.totalAmount,
+        printedTime: populatedTicket.issuedAt,
       };
 
       console.log("Dados do QR Code:", qrData);
