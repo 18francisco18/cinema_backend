@@ -7,6 +7,7 @@ let RoomsAPI = require("./server/rooms");
 let BookingAPI = require("./server/booking");
 let PasswordAPI = require("./server/password");
 let SessionsAPI = require("./server/sessions");
+let TicketsAPI = require("./server/tickets");
 
 function init() {
   let api = express();
@@ -19,6 +20,7 @@ function init() {
   api.use("/rooms", RoomsAPI());
   api.use("/bookings", BookingAPI());
   api.use("/sessions", SessionsAPI());
+  api.use("/tickets", TicketsAPI());
 
   return api;
 }

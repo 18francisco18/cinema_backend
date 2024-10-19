@@ -30,18 +30,7 @@ function BookingRouter() {
       switch (event.type) {
         case "checkout.session.completed":
           const session = event.data.object;
-
-          // Atualizar o paymentIntent com os metadados do checkout.session
-          await stripe.paymentIntents.update(session.payment_intent, {
-            metadata: {
-              bookingId: session.metadata.bookingId,
-              userId: session.metadata.userId,
-              sessionId: session.metadata.sessionId,
-              movieId: session.metadata.movieId,
-              roomId: session.metadata.roomId,
-            },
-          });
-
+          console.log("session:", session);
           console.log("Metadados atualizados para o Payment Intent:", session.payment_intent);
           break;
 
@@ -49,6 +38,11 @@ function BookingRouter() {
           const paymentIntent = event.data.object;
           console.log("Pagamento confirmado para:", paymentIntent.id);
           await bookingController.handlePaymentConfirmation(paymentIntent);
+          break;
+
+        case "charge.updated":
+          const charge = event.data.object;
+          console.log("Cobrança atualizada para:", charge.id);
           break;
           
         default:

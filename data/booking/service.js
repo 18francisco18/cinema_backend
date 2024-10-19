@@ -1,5 +1,7 @@
 const sessionModel = require("../sessions/sessions");
 const ticketModel = require("../tickets/tickets");
+const userModel = require("../users/user");
+const financialReportController = require("../financialReports/controller");
 const QRCode = require("qrcode");
 const seatStatus = require("../sessions/seatStatus");
 const sessionStatus = require("../sessions/sessionStatus");
@@ -123,15 +125,7 @@ function bookingService(bookingModel) {
 
       console.log("Session updated with reserved seats");
 
-      // Eliminar uma reserva caso o pagamento não seja confirmado em 5 minutos.
-      setTimeout(async () => {
-        let check = await bookingModel.findById(newBooking._id);
-        if (check && check.paymentStatus === "pending") {
-          await bookingModel.findByIdAndDelete(newBooking._id);
-        }
-      }, 5 * 60 * 1000);
-        
-
+      
       const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
       // Retornar a reserva.
@@ -169,6 +163,10 @@ function bookingService(bookingModel) {
     }
   }
 
+
+
+
+
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
       // Buscar a sessão de pagamento no Stripe usando o sessionId
@@ -179,7 +177,7 @@ function bookingService(bookingModel) {
         throw new Error("Payment Intent não encontrado");
       }
 
-      // Verificar se o pagamento foi realizado com sucesso
+
       // Verificar se o pagamento foi realizado com sucesso
       if (paymentIntent.status === "succeeded") {
         const bookingId = paymentIntent.metadata
@@ -197,6 +195,12 @@ function bookingService(bookingModel) {
 
         // Atualizar o status de pagamento para "paid"
         booking.paymentStatus = "paid";
+
+        // Recompensar o utilizador com pontos com base no valor do pagamento
+        await userModel.findByIdAndUpdate(
+          booking.user._id,
+          { $inc: { points: paymentIntent.amount_received } } // Incrementa pontos ao utilizador
+        );
 
         // Gerar o QR Code usando a função existente
         const qrCode = await generateQRCode(booking);
@@ -226,6 +230,20 @@ function bookingService(bookingModel) {
         // Salvar a reserva atualizada com o status de pagamento
         await booking.save();
 
+        // Formatar um relatório de pagamento interno
+        const report = {
+          paymentId: paymentIntent.id,
+          customerName: booking.user.name,
+          customerEmail: booking.user.email,
+          amount: paymentIntent.amount_received / 100,
+          currency: paymentIntent.currency,
+          paymentMethod: paymentIntent.payment_method_types[0],
+          created_at: new Date(paymentIntent.created * 1000),
+        }
+
+        // Criar um relatório de pagamento interno
+        await financialReportController.createInternalPaymentReport(report);
+
         return { message: "Payment confirmed, QR Code sent", booking };
       } else {
         throw new Error("Payment not confirmed");
@@ -235,6 +253,9 @@ function bookingService(bookingModel) {
       throw new Error("Error during payment confirmation");
     }
   }
+
+
+
 
   // Função para criar o pagamento de uma reserva
   async function createPaymentSession(booking) {
@@ -255,43 +276,57 @@ function bookingService(bookingModel) {
         throw new Error("Session not found");
       }
 
-      // Criar uma sessão de pagamento no Stripe
-      const paymentSession = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"], // Para aceitar cartões de crédito/débito
-        line_items: [
-          {
-            price_data: {
-              currency: "eur", // Substitua pela moeda desejada (ex: eur, brl)
-              product_data: {
-                name: `Movie Ticket for ${session.movie.title}`,
-                description: `
-                Seats: ${booking.seats.join(", ")}
-                Room: ${session.room.name}
-                Cinema: ${session.room.cinema.name}
-              `,
-                images: [session.movie.poster], // Supondo que a URL da imagem da capa do filme está em session.movie.poster
-              },
-              unit_amount: session.price * 100, // O Stripe lida com valores em centavos
-            },
-            quantity: booking.seats.length,
-          },
+      if (!booking.user._id) {
+        throw new Error("User not found");
+      }
+
+      // Primeiro, criar o PaymentIntent com a metadata
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: session.price * 100 * booking.seats.length,
+        currency: "eur",
+        payment_method_types: [
+          "card", // Cartão de crédito/débito
+          "multibanco", // Para Multibanco (Portugal)
         ],
-        mode: "payment",
-        success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
-        cancel_url: "http://localhost:4000/cancel",
         metadata: {
-          bookingId: booking._id.toString(), // Certifique-se de que o bookingId é uma string
-          userId: booking.user._id.toString(), // Certifique-se de que o userId é uma string
-          sessionId: booking.session._id.toString(), // Certifique-se de que o sessionId é uma string
-          movieId: session.movie._id.toString(), // Certifique-se de que o movieId é uma string
-          roomId: session.room._id.toString(), // Certifique-se de que o roomId é uma string
+          bookingId: booking._id.toString(),
+          userId: booking.user._id.toString(),
+          sessionId: booking.session._id.toString(),
+          movieId: session.movie._id.toString(),
+          roomId: session.room._id.toString(),
         },
       });
 
-      const retrievedSession = await stripe.checkout.sessions.retrieve(
-        paymentSession.id
-      );
-      console.log("Checkout Session Metadata:", retrievedSession.metadata);
+      // Criar a sessão de checkout associando o PaymentIntent recém-criado
+      const paymentSession = await stripe.checkout.sessions.create({
+        payment_intent_data: {
+          metadata: paymentIntent.metadata, 
+        },
+        success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
+        cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
+        line_items: [
+          {
+            price_data: {
+              currency: "eur", // A mesma moeda
+              product_data: {
+                name: `Movie Ticket for ${session.movie.title}`,
+                description: `
+                  Seats: ${booking.seats.join(", ")}
+                  Room: ${session.room.name}
+                  Cinema: ${session.room.cinema.name}
+                `,
+                images: [session.movie.poster], // URL da imagem do pôster do filme
+              },
+              unit_amount: session.price * 100, // Preço unitário por ingresso em centavos
+            },
+            quantity: booking.seats.length, // Quantidade de assentos reservados
+          },
+        ],
+        mode: "payment", // Modo de pagamento (apenas para pagamento completo)
+      });
+
+      
+      
       console.log("Payment session created:", paymentSession.id);
       return { url: paymentSession.url };
     } catch (error) {
@@ -300,6 +335,7 @@ function bookingService(bookingModel) {
     }
   }
 
+  
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
     try {
@@ -370,6 +406,7 @@ function bookingService(bookingModel) {
     });
   }
 
+  
   async function findById(id) {
     try {
       const booking = await bookingModel
@@ -431,6 +468,40 @@ function bookingService(bookingModel) {
       throw new Error("Error updating booking");
     }
   }
+
+  async function cancelReservation(bookingId) {
+    try {
+      const booking = await bookingModel.findByIdAndUpdate(
+        bookingId,
+        { status: "cancelled" },
+        { new: true }
+      );
+
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+    } catch (error) {
+      console.log(error);
+      throw new Error("Error cancelling reservation");
+    }
+  }
+
+  // Função para reembolsar um pagamento por stripe
+  async function refundPayment(paymentIntentId, amount = null) {
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: paymentIntentId, // ID do PaymentIntent
+        amount: amount, // Valor a ser reembolsado (em centavos)
+      });
+      console.log("Reembolso criado:", refund);
+      return refund;
+    } catch (error) {
+      console.error("Erro ao criar reembolso:", error);
+      throw error;
+    }
+  }
+
+
 
   return service;
 }

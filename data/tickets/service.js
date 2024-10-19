@@ -6,7 +6,8 @@ function TicketService(ticketModel) {
         create,
         findById,
         findAll,
-        removeById
+        removeById,
+        verifyQRCode,
     };
 
     async function create(ticket) {
@@ -48,6 +49,33 @@ function TicketService(ticketModel) {
         } catch (error) {
             console.log(error);
             throw new Error(`Error deleting ticket: ${error.message}`);
+        }
+    }
+
+    async function verifyQRCode(reservationId) {
+        try {
+            const ticket = await ticketModel.findById(reservationId);
+
+            if (!ticket) {
+                return res.status(404).json({ message: 'Ticket not found' });
+            }
+
+            if (ticket.status === 'used') {
+                return res.status(400).json({ message: 'Ticket has already been used' });
+            }
+
+            if (ticket.status === 'cancelled') {
+                return res.status(400).json({ message: 'Ticket has been cancelled' });
+            }
+
+            // Marcar o bilhete como usado
+            ticket.status === "used";
+            await ticket.save();
+
+            return res.status(200).json({ message: 'Ticket verified successfully' });
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ message: 'Internal server error', error });
         }
     }
 
