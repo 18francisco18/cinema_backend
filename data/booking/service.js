@@ -10,6 +10,7 @@ const dotenv = require("dotenv");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
+
 dotenv.config();
 
 const transporter = nodeMailer.createTransport({
@@ -28,6 +29,7 @@ function bookingService(bookingModel) {
     removeById,
     updateById,
     handlePaymentConfirmation,
+    cancelReservation,
   };
 
   async function create(booking, sessionId) {
@@ -125,7 +127,6 @@ function bookingService(bookingModel) {
 
       console.log("Session updated with reserved seats");
 
-      
       const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
 
       // Retornar a reserva.
@@ -163,10 +164,6 @@ function bookingService(bookingModel) {
     }
   }
 
-
-
-
-
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
       // Buscar a sessão de pagamento no Stripe usando o sessionId
@@ -176,7 +173,6 @@ function bookingService(bookingModel) {
       if (!paymentIntent) {
         throw new Error("Payment Intent não encontrado");
       }
-
 
       // Verificar se o pagamento foi realizado com sucesso
       if (paymentIntent.status === "succeeded") {
@@ -203,14 +199,23 @@ function bookingService(bookingModel) {
         );
 
         // Gerar o QR Code usando a função existente
-        const qrCode = await generateQRCode(booking);
+        const tickets = await generateQRCode(booking);
+
+        // Gerar a lista de QR codes e assentos para incluir no e-mail
+        const qrCodeImages = tickets.map((ticket) => {
+            return `
+          <p><strong>Seat:</strong> ${ticket.ticket.seat}</p>
+          <img src="${ticket.qrCode}" alt="QR Code for seat ${ticket.ticket.seat}" />
+        `;
+          })
+          .join("");
 
         // Configurar as opções de e-mail para enviar o QR Code
         const mailOptions = {
           from: process.env.EMAIL_ADDRESS,
           to: booking.user.email,
-          subject: "Your Movie Booking - QR Code",
-          text: `Your booking is confirmed for ${booking.seats.length} seat(s). Please find your QR Code attached.`,
+          subject: "Your Movie Booking - QR Codes",
+          text: `Your booking is confirmed for ${booking.seats.length} seat(s). Please find your QR Codes attached.`,
           html: `
           <p>Dear ${booking.user.name},</p>
           <p>Thank you for booking your tickets! Here are the details:</p>
@@ -218,8 +223,8 @@ function bookingService(bookingModel) {
             <li><strong>Booking ID:</strong> ${booking._id}</li>
             <li><strong>Seats:</strong> ${booking.seats.join(", ")}</li>
           </ul>
-          <p>Please use the QR code below for entry:</p>
-          <img src="${qrCode}" alt="QR Code" />
+          <p>Please use the QR codes below for entry:</p>
+          ${qrCodeImages}
           <p>Enjoy your movie!</p>
         `,
         };
@@ -239,7 +244,7 @@ function bookingService(bookingModel) {
           currency: paymentIntent.currency,
           paymentMethod: paymentIntent.payment_method_types[0],
           created_at: new Date(paymentIntent.created * 1000),
-        }
+        };
 
         // Criar um relatório de pagamento interno
         await financialReportController.createInternalPaymentReport(report);
@@ -253,9 +258,6 @@ function bookingService(bookingModel) {
       throw new Error("Error during payment confirmation");
     }
   }
-
-
-
 
   // Função para criar o pagamento de uma reserva
   async function createPaymentSession(booking) {
@@ -300,7 +302,7 @@ function bookingService(bookingModel) {
       // Criar a sessão de checkout associando o PaymentIntent recém-criado
       const paymentSession = await stripe.checkout.sessions.create({
         payment_intent_data: {
-          metadata: paymentIntent.metadata, 
+          metadata: paymentIntent.metadata,
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
@@ -325,9 +327,6 @@ function bookingService(bookingModel) {
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
 
-      
-      
-      console.log("Payment session created:", paymentSession.id);
       return { url: paymentSession.url };
     } catch (error) {
       console.error("Error creating payment session:", error);
@@ -335,62 +334,90 @@ function bookingService(bookingModel) {
     }
   }
 
-  
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
     try {
       // Buscar a reserva populada para obter os dados necessários
-      const populatedBooking = await bookingModel.findById(booking._id);
-
-      // Criar um novo bilhete associado à reserva
-      const newTicket = await ticketModel.create({
-        booking: populatedBooking._id,
-      });
-
-      // Popula o novo bilhete com os dados da reserva
-      const populatedTicket = await ticketModel
-        .findById(newTicket._id)
+      const populatedBooking = await bookingModel
+        .findById(booking._id)
         .populate({
-          path: "booking",
+          path: "session",
           populate: [
+            { path: "movie", select: "title" },
             {
-              path: "session",
-              populate: [
-                { path: "movie", select: "title" },
-                {
-                  path: "room",
-                  select: "name",
-                  populate: { path: "cinema", select: "name" },
-                },
-              ],
+              path: "room",
+              select: "name",
+              populate: { path: "cinema", select: "name" },
             },
           ],
         });
 
-      // Dados que serão codificados no QR Code
-      const qrData = {
-        reservationId: populatedTicket._id,
-        reservationNumber: populatedTicket.ticketNumber,
-        userId: populatedTicket.booking.user._id,
-        sessionId: populatedTicket.booking.session._id,
-        movie: populatedTicket.booking.session.movie._id,
-        room: populatedTicket.booking.session.room._id,
-        cinema: populatedTicket.booking.session.room.cinema._id,
-        seats: populatedTicket.booking.seats,
-        startTime: populatedTicket.booking.session.startTime,
-        totalAmount: populatedTicket.booking.totalAmount,
-        printedTime: populatedTicket.issuedAt,
-      };
+      // Lista para armazenar os bilhetes gerados
+      const tickets = [];
+      const qrCodes = []; // Lista para armazenar os QR Codes gerados
 
-      console.log("Dados do QR Code:", qrData);
+      // Para cada assento reservado, criar um bilhete separado
+      for (const seat of populatedBooking.seats) {
+        const newTicket = await ticketModel.create({
+          booking: populatedBooking._id, // ID da reserva
+          seat: seat, // Assento associado ao bilhete
+        });
 
-      // Gera o QR Code como uma string base64
-      const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+        // Popula o ticket criado com a reserva completa para associar todos os dados
+        const populatedTicket = await ticketModel
+          .findById(newTicket._id)
+          .populate({
+            path: "booking",
+            populate: [
+              {
+                path: "session",
+                populate: [
+                  { path: "movie", select: "title" },
+                  {
+                    path: "room",
+                    select: "name",
+                    populate: { path: "cinema", select: "name" },
+                  },
+                ],
+              },
+            ],
+          });
 
-      return qrCode; // Retorna o QR Code gerado (em formato base64)
+        // Dados que serão codificados no QR Code para cada bilhete
+        const qrData = {
+          ticketId: populatedTicket._id, // ID do bilhete único
+          reservationNumber: populatedTicket.ticketNumber, // Número do bilhete
+          userId: populatedBooking.user._id, // ID do usuário
+          sessionId: populatedBooking.session._id, // ID da sessão
+          movie: populatedBooking.session.movie.title, // Filme da sessão
+          room: populatedBooking.session.room.name, // Nome da sala
+          cinema: populatedBooking.session.room.cinema.name, // Nome do cinema
+          seat: populatedTicket.seat, // Assento do bilhete
+          startTime: populatedBooking.session.startTime, // Hora de início da sessão
+          totalAmount: populatedBooking.totalAmount, // Valor total da reserva
+          printedTime: populatedTicket.issuedAt, // Hora de emissão do bilhete
+        };
+
+        console.log("Dados do QR Code:", qrData);
+
+        // Gera o QR Code como uma string base64
+        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+
+        // Adiciona o bilhete com o QR Code gerado na lista de tickets
+        tickets.push({
+          ticket: populatedTicket,
+          qrCode: qrCode,
+        });
+
+        // Adiciona o QR Code gerado na lista de QR Codes
+        qrCodes.push(qrCode);
+      }
+
+      // Retorna a lista de QR Codes gerados
+      return tickets;
     } catch (error) {
-      console.error("Erro ao gerar QR Code:", error);
-      throw new Error("Falha ao gerar o QR Code");
+      console.error("Erro ao gerar bilhetes e QR Codes:", error);
+      throw new Error("Falha ao gerar bilhetes e QR Codes");
     }
   }
 
@@ -406,7 +433,6 @@ function bookingService(bookingModel) {
     });
   }
 
-  
   async function findById(id) {
     try {
       const booking = await bookingModel
@@ -469,17 +495,93 @@ function bookingService(bookingModel) {
     }
   }
 
-  async function cancelReservation(bookingId) {
+  // Função para cancelar uma reserva
+  // Necessário verificar utilizador.
+  async function cancelReservation(paymentIntentId) {
     try {
-      const booking = await bookingModel.findByIdAndUpdate(
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+      if (!paymentIntent) {
+        throw new Error("Payment Intent não encontrado");
+      }
+
+      // Verificar se o bookingId está presente nos metadados do PaymentIntent
+      const bookingId = paymentIntent.metadata
+        ? paymentIntent.metadata.bookingId
+        : null;
+      if (!bookingId) {
+        throw new Error("Booking ID não encontrado nos metadados");
+      }
+
+      // Buscar a reserva com o ID fornecido
+      const booking = await bookingModel
+        .findById(bookingId)
+        .populate("session");
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      // Verificar se a reserva já foi cancelada
+      if (booking.status === "cancelled") {
+        throw new Error("Booking is already cancelled");
+      }
+
+      const currentTime = Date.now();
+      const sessionStartTime = new Date(booking.session.startTime).getTime();
+      const twoHoursInMillis = 2 * 60 * 60 * 1000;
+      const thirtyMinutesInMillis = 30 * 60 * 1000;
+
+      // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
+      // para calcular o reembolso.
+      const balanceTransactionId =
+        paymentIntent.charges.data[0].balance_transaction;
+      const balanceTransaction = await stripe.balanceTransactions.retrieve(
+        balanceTransactionId
+      );
+      const netAmount = balanceTransaction.net;
+
+      if (sessionStartTime - currentTime > twoHoursInMillis) {
+        try {
+          await refundPayment(paymentIntentId, netAmount);
+        } catch (error) {
+          console.error("Erro ao reembolsar pagamento:", error);
+          throw new Error("Erro ao reembolsar pagamento");
+        }
+      } else if (
+        sessionStartTime - currentTime <=
+        twoHoursInMillis >
+        thirtyMinutesInMillis
+      ) {
+        try {
+          await refundPayment(paymentIntentId, netAmount / 2);
+        } catch (error) {
+          console.error("Erro ao reembolsar pagamento:", error);
+          throw new Error("Erro ao reembolsar pagamento");
+        }
+      } else {
+        throw new Error("Não é possível reembolsar a reserva");
+      }
+
+      const bookingUpdate = await bookingModel.findByIdAndUpdate(
         bookingId,
         { status: "cancelled" },
         { new: true }
       );
 
-      if (!booking) {
-        throw new Error("Booking not found");
-      }
+      // Atualizar o status dos assentos reservados para "disponível"
+      booking.session.seats = booking.session.seats.map((row) =>
+        row.map((seat) => {
+          if (booking.seats.includes(seat.seat)) {
+            return { ...seat, status: "available" };
+          }
+          return seat;
+        })
+      );
+
+      await booking.session.save(); // Salvar a sessão com os assentos atualizados
+
+      return bookingUpdate;
     } catch (error) {
       console.log(error);
       throw new Error("Error cancelling reservation");
@@ -500,8 +602,6 @@ function bookingService(bookingModel) {
       throw error;
     }
   }
-
-
 
   return service;
 }

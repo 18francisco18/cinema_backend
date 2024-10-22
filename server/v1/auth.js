@@ -1,11 +1,11 @@
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const express = require("express");
-const Users = require("../data/users");
-const User = require("../data/users/user");
-const VerifyToken = require("../middleware/token");
+const Users = require("../../data/users");
+const User = require("../../data/users/user");
+const VerifyToken = require("../../middleware/token");
 const jwt = require("jsonwebtoken");
-const config = require("../config");
+const config = require("../../config");
 
 const AuthRouter = () => {
   let router = express();

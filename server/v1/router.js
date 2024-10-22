@@ -1,13 +1,14 @@
-let UsersAPI = require("./server/auth");
-let MoviesAPI = require("./server/movies");
+
+let UsersAPI = require("./auth");
+let MoviesAPI = require("./movies");
 const express = require("express");
-let AuthAPI = require("./server/auth");
-let CinemaAPI = require("./server/cinema");
-let RoomsAPI = require("./server/rooms");
-let BookingAPI = require("./server/booking");
-let PasswordAPI = require("./server/password");
-let SessionsAPI = require("./server/sessions");
-let TicketsAPI = require("./server/tickets");
+let AuthAPI = require("./auth");
+let CinemaAPI = require("./cinema");
+let RoomsAPI = require("./rooms");
+let BookingAPI = require("./booking");
+let PasswordAPI = require("./password");
+let SessionsAPI = require("./sessions");
+let TicketsAPI = require("./tickets");
 
 function init() {
   let api = express();

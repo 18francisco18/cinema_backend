@@ -1,6 +1,6 @@
 const bodyParser = require("body-parser");
 const express = require("express");
-const ticketsController = require("../data/tickets/controller");
+const ticketsController = require("../../data/tickets/controller");
 
 function TicketsRouter() {
   let router = express();

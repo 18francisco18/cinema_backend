@@ -1,6 +1,6 @@
 const bodyParser = require("body-parser");
 const express = require("express");
-const bookingController = require("../data/booking/controller");
+const bookingController = require("../../data/booking/controller");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 function BookingRouter() {
@@ -31,7 +31,10 @@ function BookingRouter() {
         case "checkout.session.completed":
           const session = event.data.object;
           console.log("session:", session);
-          console.log("Metadados atualizados para o Payment Intent:", session.payment_intent);
+          console.log(
+            "Metadados atualizados para o Payment Intent:",
+            session.payment_intent
+          );
           break;
 
         case "payment_intent.succeeded":
@@ -44,7 +47,7 @@ function BookingRouter() {
           const charge = event.data.object;
           console.log("Cobrança atualizada para:", charge.id);
           break;
-          
+
         default:
           console.warn(`Evento não tratado: ${event.type}`);
       }

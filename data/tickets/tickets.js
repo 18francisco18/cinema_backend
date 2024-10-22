@@ -6,6 +6,7 @@ const Schema = mongoose.Schema;
 const ticketSchema = new Schema({
   ticketNumber: { type: Number, unique: true },
   booking: { type: Schema.Types.ObjectId, ref: "Booking", required: true },
+  seat: { type: String, required: true },
   status: {
     type: String,
     enum: ["booked", "used", "cancelled"],
