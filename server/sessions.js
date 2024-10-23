@@ -15,6 +15,7 @@ function SessionsRouter() {
     router.delete('/:id', sessionsController.deleteSession);
     router.post('/checkAvailability', sessionsController.checkAvailability);
     router.put('/:id/applyUnavailability', sessionsController.applyUnavaliabilityToSeats);
+    router.get('/:id/report', sessionsController.getSessionsReport);
 
     return router;
 }

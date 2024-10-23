@@ -1,6 +1,7 @@
 const sessionModel = require("../sessions/sessions");
 const ticketModel = require("../tickets/tickets");
 const userModel = require("../users/user");
+const mongoose = require("mongoose");
 const financialReportController = require("../financialReports/controller");
 const QRCode = require("qrcode");
 const seatStatus = require("../sessions/seatStatus");
@@ -31,43 +32,50 @@ function bookingService(bookingModel) {
   };
 
   async function create(booking, sessionId) {
+    const session = await mongoose.startSession();
+    session.startTransaction(); // Iniciar uma transação
+
     try {
-      // Buscar a sessão associada à reserva.
-      const session = await sessionModel.findById(sessionId);
+      // Buscar a sessão associada à reserva com a transação.
+      const sessionData = await sessionModel.findById(sessionId).session(session);
 
       // Caso a sessão não exista, lançar um erro.
-      if (!session) {
+      if (!sessionData) {
         throw new Error("Session not found");
       }
 
       // Caso a sessão esteja cheia, lançar um erro.
-      if (session.status === sessionStatus.soldOut) {
+      if (sessionData.status === sessionStatus.soldOut) {
         throw new Error("Session is already sold out");
       }
 
       // Caso a sessão esteja cancelada, lançar um erro.
-      if (session.status === sessionStatus.cancelled) {
+      if (sessionData.status === sessionStatus.cancelled) {
         throw new Error("Session is cancelled");
       }
 
       // Caso a sessão esteja finalizada, lançar um erro.
-      if (session.status === sessionStatus.finished) {
+      if (sessionData.status === sessionStatus.finished) {
         throw new Error("Session is finished");
       }
 
       // Caso a sessão esteja em andamento, lançar um erro.
-      if (new Date(session.endTime) < new Date()) {
+      if (new Date(sessionData.endTime) < new Date()) {
         throw new Error("Cannot book a session in the past");
       }
 
       // Obter a lista de assentos da sessão especificada.
-      // Junta todas as fileiras de assentos em uma única lista.
-      const sessionSeats = session.seats.flat();
+      const sessionSeats = sessionData.seats.flat();
+
+
+      // Se existirem assentos já reservados, lançar um erro.
+      if (alreadyReservedSeats.length > 0) {
+        throw new Error(
+          `The following seats are already reserved: ${alreadyReservedSeats.join(", ")}`
+        );
+      }
 
       // Filtrar os assentos solicitados na reserva que não estão disponíveis.
-      // O invalidSeats vai filtrar na array de assentos do booking um a um, e verificar
-      // se o assento existe na sessão. No fim, irá retornar os assentos que não existem
-      // ou que não estão disponíveis.
       const invalidSeats = booking.seats.filter((seat) => {
         const sessionSeat = sessionSeats.find((s) => s.seat === seat);
         return !sessionSeat || sessionSeat.status !== seatStatus.available;
@@ -76,31 +84,24 @@ function bookingService(bookingModel) {
       // Se existirem assentos inválidos, lançar um erro.
       if (invalidSeats.length > 0) {
         throw new Error(
-          `The following seats are invalid or unavailable: ${invalidSeats.join(
-            ", "
-          )}`
+          `The following seats are invalid or unavailable: ${invalidSeats.join(", ")}`
         );
       }
 
-      // Calcular o valor total da reserva multiplicando o número de assentos com
-      // o preço de cada bilhete da sessão.
-      const totalAmount = booking.seats.length * session.price;
+      // Calcular o valor total da reserva multiplicando o número de assentos com o preço de cada bilhete da sessão.
+      const totalAmount = booking.seats.length * sessionData.price;
 
-      // Criar a nova reserva, inserindo os dados de booking e reescreve o totalAmount
-      // de forma a inserir o valor total da reserva que foi calculado em cima.
+      // Criar a nova reserva, inserindo os dados de booking e o valor total calculado.
       let newBooking = new bookingModel({
         ...booking,
         totalAmount,
         paymentStatus: "pending",
       });
 
-      const savedBooking = await save(newBooking); // Salvar a reserva no banco de dados.
+      const savedBooking = await newBooking.save({ session }); // Salvar a reserva no banco de dados dentro da transação.
 
       // Atualizar o status dos assentos reservados para "reservado".
-      // Ao buscar os assentos da sessão, é feito um mapeamento para verificar dentro de cada
-      // array de assentos, se o assento está presente na reserva.
-      // Caso esteja, o status do assento é atualizado para "reservado".
-      session.seats = session.seats.map((row) =>
+      sessionData.seats = sessionData.seats.map((row) =>
         row.map((seat) => {
           if (booking.seats.includes(seat.seat)) {
             return { ...seat, status: seatStatus.reserved };
@@ -109,28 +110,31 @@ function bookingService(bookingModel) {
         })
       );
 
-      // Verificar se ainda existem assentos disponíveis na sessão
-      // juntando as arrays de assentos da sessão em uma só array.
-      // Utilizando o método some, é possível verificar se existe pelo menos um assento
-      // disponível na sessão. Caso seja falso, a sessão é marcada como esgotada.
-      const remainingAvailableSeats = session.seats
+      // Verificar se ainda existem assentos disponíveis na sessão.
+      const remainingAvailableSeats = sessionData.seats
         .flat()
         .some((seat) => seat.status === seatStatus.available);
 
       if (!remainingAvailableSeats) {
-        session.status = sessionStatus.soldOut; // Marcar a sessão como esgotada
+        sessionData.status = sessionStatus.soldOut; // Marcar a sessão como esgotada.
       }
 
-      await session.save(); // Salvar a sessão com os assentos atualizados.
+      await sessionData.save({ session }); // Salvar a sessão com os assentos atualizados dentro da transação.
 
       console.log("Session updated with reserved seats");
 
-      
-      const paymentConfirmation = await createPaymentSession(savedBooking); // Criar a sessão de pagamento no Stripe.
+      // Criar a sessão de pagamento no Stripe.
+      const paymentConfirmation = await createPaymentSession(savedBooking);
+
+      // Confirmar a transação.
+      await session.commitTransaction(); // Confirmar a transação.
+      session.endSession(); // Encerrar a sessão.
 
       // Retornar a reserva.
       return { booking: savedBooking, paymentUrl: paymentConfirmation.url };
     } catch (error) {
+      await session.abortTransaction(); // Cancelar a transação em caso de erro.
+      session.endSession(); // Encerrar a sessão.
       console.log(error);
 
       if (error.message === "Session not found") {
@@ -153,9 +157,7 @@ function bookingService(bookingModel) {
         throw new Error("Cannot book a session in the past");
       }
 
-      if (
-        error.message.includes("The following seats are invalid or unavailable")
-      ) {
+      if (error.message.includes("The following seats are invalid or unavailable")) {
         throw new Error(error.message);
       }
 

@@ -1,4 +1,5 @@
 const axios = require("axios");
+const mongoose = require("mongoose");
 const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
 
 function MovieService(movieModel) {
@@ -140,10 +141,18 @@ function MovieService(movieModel) {
   }
 
   // Função para buscar todos os filmes no banco de dados
-  async function findAll() {
+  async function findAll(page, limit) {
     try {
-      const movies = await movieModel.find();
-      return movies;
+      const movies = await movieModel.find()
+        .skip((page - 1) * limit)
+        .limit(limit);
+        const totalMovies = await movieModel.countDocuments();
+      return {
+        movies,
+        totalPages: Math.ceil(totalMovies / limit),
+        currentPage: page,
+        totalMovies,
+      };
     } catch (err) {
       throw new Error("Erro ao buscar os filmes");
     }

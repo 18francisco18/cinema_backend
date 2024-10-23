@@ -22,3 +22,7 @@ const sessionReportSchema = new Schema({
   seatsUnsold: { type: Number, required: true, default: 0 },
   reportGeneratedAt: { type: Date, default: Date.now },
 });
+
+const SessionReport = mongoose.model('SessionReport', sessionReportSchema);
+
+module.exports = SessionReport;

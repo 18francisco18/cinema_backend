@@ -8,7 +8,8 @@ const sessionsController = {
     deleteSession,
     checkAvailability,
     checkAndUpdateSessions,
-    applyUnavaliabilityToSeats
+    applyUnavaliabilityToSeats,
+    getSessionsReport,
 }
 
 // Controlador para criar uma nova sessão
@@ -189,6 +190,20 @@ async function applyUnavaliabilityToSeats(req, res) {
     console.error(error.message);
 
     res.status(500).json({ error: 'Error applying unavaliability to seats' });
+  }
+}
+
+async function getSessionsReport(req, res) {
+  try {
+    const { id } = req.params;
+
+    const sessionsReport = await sessionService.generateSessionReport(id);
+
+    res.status(200).json(sessionsReport);
+  } catch (error) {
+    console.error(error.message);
+
+    res.status(500).json({ error: 'Error getting sessions report' });
   }
 }
 

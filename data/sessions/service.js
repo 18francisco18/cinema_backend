@@ -4,6 +4,7 @@ const Session = require("./sessions");
 const Movie = require("../movies/movies");
 const seatStatus = require("./seatStatus");
 const sessionStatus = require("./sessionStatus");
+const sessionReport = require("./sessionReport");
 
 function sessionService(sessionModel) {
   let service = {
@@ -16,6 +17,7 @@ function sessionService(sessionModel) {
     cancelSession,
     deleteSessions,
     applyUnavaliabilityToSeats,
+    generateSessionReport,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -276,6 +278,97 @@ function sessionService(sessionModel) {
 
       throw new Error(`Error applying unavailability to seats: ${error.message}`);
     } 
+  }
+
+  // Função para gerar um relatório de sessão
+  async function generateSessionReport(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      if (!session) {
+        throw new Error("Session not found");
+      }
+
+      // Obter o número total de assentos da sala
+      let room = await RoomModel.findById(session.room);
+      if (!room) {
+        throw new Error("Room not found");
+      }
+
+      let totalSeats = room.seats;
+
+      // Obter o número total de assentos vendidos
+      let tickets = await sessionModel.findById(sessionId).populate("tickets");
+      let ticketsSold = tickets.length;
+
+      // Obter o número total de cancelamentos
+      let cancellations = await sessionModel.findById(sessionId).populate("cancellations");
+      let cancellationsTotal = cancellations.length;
+
+      // Obter o número de cancelamentos por período
+      let cancellationsBefore2Hours = 0;
+      let cancellationsBetween2HoursAnd30Minutes = 0;
+      let cancellationsAfter30Minutes = 0;
+
+      cancellations.forEach((cancellation) => {
+        const cancellationTime = cancellation.createdAt;
+        const timeDifference = (session.startTime - cancellationTime) / 1000 / 60; // Diferença em minutos
+
+        if (timeDifference >= 120) {
+          cancellationsBefore2Hours++;
+        } else if (timeDifference >= 30) {
+          cancellationsBetween2HoursAnd30Minutes++;
+        } else {
+          cancellationsAfter30Minutes++;
+        }
+      });
+
+      // Obter o valor total gerado com a venda de ingressos
+      let ticketAmountGenerated = ticketsSold * session.price;
+
+      // Obter o valor total gerado com cancelamentos
+      let cancellationAmountGenerated = cancellationsTotal * session.price;
+
+      // Obter o valor total gerado
+      let totalAmountGenerated = ticketAmountGenerated - cancellationAmountGenerated;
+
+      // Obter o número de assentos não vendidos
+      let seatsUnsold = totalSeats - ticketsSold;
+
+      // Gerar o relatório da sessão
+      sessionReport = new sessionReport({
+        sessionId: sessionId,
+        sessionTicketPrice: session.price,
+        ticketsSold: ticketsSold,
+        totalTicketsSold: ticketsSold,
+        cancellationsTotal: cancellationsTotal,
+        cancellationsPeriods: {
+          before2Hours: cancellationsBefore2Hours,
+          between2HoursAnd30Minutes: cancellationsBetween2HoursAnd30Minutes,
+          after30Minutes: cancellationsAfter30Minutes,
+        },
+        ticketAmountGenerated: ticketAmountGenerated,
+        cancellationAmountGenerated: cancellationAmountGenerated,
+        totalAmountGenerated: totalAmountGenerated,
+        seatsUnsold: seatsUnsold,
+      });
+
+      // Salvar o relatório da sessão no banco de dados
+      await sessionReport.save();
+      return sessionReport;
+    }
+    catch (error) {
+      console.log(error);
+
+      if (error.message === "Session not found") {
+        throw new Error("Session not found");
+      }
+
+      if (error.message === "Room not found") {
+        throw new Error("Room not found");
+      }
+
+      throw new Error(`Error generating session report: ${error.message}`);
+    }
   }
 
   return service;
