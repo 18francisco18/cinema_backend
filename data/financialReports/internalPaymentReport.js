@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const InternalPaymentReportSchema = new Schema({
+  type: { type: String, required: true, default: "internalPaymentReport"},
   paymentId: { type: String, required: true },
   customerName: { type: String, required: true },
   customerEmail: { type: String, required: true },

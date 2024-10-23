@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cron = require("node-cron");
 const CORS = require("cors");
 const sessionService = require("./data/sessions");
+const apiVersion = process.env.API_VERSION || 'v1';
 
 const config = require("./config");
 
@@ -15,7 +16,7 @@ mongoose
   .then(() => console.log("Connection successful!"))
   .catch((err) => console.error(err));
 
-let router = require("./router");
+let router = require(`./server/${apiVersion}/router`);
 var app = express();
 app.use(CORS({
   origin: 'http://localhost:4000',
@@ -41,5 +42,5 @@ cron.schedule('*/5 * * * *', () => {
 const server = http.Server(app);
 
 server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port}`);
+  console.log(`Server running at http://${hostname}:${port} with API version: ${apiVersion}`);
 });

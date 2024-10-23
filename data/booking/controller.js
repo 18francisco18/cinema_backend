@@ -6,7 +6,8 @@ const bookingController = {
     getAllBookings,
     removeBookingById,
     updateBookingById,
-    handlePaymentConfirmation
+    handlePaymentConfirmation,
+    cancelReservation,
 }
 
 
@@ -49,6 +50,7 @@ async function getAllBookings(req, res) {
     }
 }
 
+// Controlador para remover uma reserva pelo id
 async function removeBookingById(req, res) {
     try {
         const { id } = req.params;
@@ -63,6 +65,7 @@ async function removeBookingById(req, res) {
     }
 }
 
+// Controlador para atualizar uma reserva pelo id
 async function updateBookingById(req, res) {
     try {
         const { id } = req.params;
@@ -79,11 +82,28 @@ async function updateBookingById(req, res) {
     }
 }
 
+
 async function handlePaymentConfirmation(paymentIntentId) {
     try {
         await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {
         console.error("Erro ao confirmar pagamento:", error.message);
+    }
+}
+
+
+// Controlador para cancelar uma reserva
+async function cancelReservation(req, res) {
+    try {
+        const { paymentIntentId } = req.params;
+        await bookingService.cancelReservation(paymentIntentId);
+        res.status(204).send();
+    } catch (error) {
+        if (error.message === "Booking not found") {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Internal Server Error" });
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const User = require("../data/users/user");
+const User = require("../../data/users/user");
 const secret = "supersecret";
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");

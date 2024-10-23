@@ -1,6 +1,6 @@
 const bodyParser = require("body-parser");
 const express = require("express");
-const movieController = require("../data/movies/controller");
+const movieController = require("../../data/movies/controller");
 
 function MoviesRouter() {
   let router = express();
