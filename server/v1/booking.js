@@ -67,6 +67,7 @@ function BookingRouter() {
   router.get("/findAll", bookingController.getAllBookings);
   router.delete("/remove/:id", bookingController.removeBookingById);
   router.put("/update/:id", bookingController.updateBookingById);
+  router.post("/:id/refund", bookingController.refundBooking);
 
   return router;
 }

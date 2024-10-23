@@ -8,6 +8,7 @@ const bookingController = {
     updateBookingById,
     handlePaymentConfirmation,
     cancelReservation,
+    refundBooking,
 }
 
 
@@ -107,7 +108,21 @@ async function cancelReservation(req, res) {
     }
 }
 
-
+// Controlador para reembolsar uma reserva
+async function refundBooking(req, res) {
+    try {
+        const { paymentIntentId } = req.params;
+        const { amount } = req.body;
+        await bookingService.refundPayment(paymentIntentId, amount);
+        res.status(204).send();
+    } catch (error) {
+        if (error.message === "Booking not found") {
+            res.status(404).json({ error: error.message });
+        } else {
+            res.status(500).json({ error: "Internal Server Error" });
+        }
+    }
+}
 
 
 module.exports = bookingController;

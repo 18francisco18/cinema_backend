@@ -17,7 +17,7 @@ function financialReportsService(financialReportsModel) {
           const reportsPath = path.join(
             "C:",
             "Users",
-            "Rui Barbosa",
+            "Asus",
             "Desktop",
             "relatorios_vendas"
           );

@@ -31,6 +31,7 @@ function bookingService(bookingModel) {
     updateById,
     handlePaymentConfirmation,
     cancelReservation,
+    refundPayment,
   };
 
   async function create(booking, sessionId) {
@@ -68,14 +69,6 @@ function bookingService(bookingModel) {
 
       // Obter a lista de assentos da sessão especificada.
       const sessionSeats = sessionData.seats.flat();
-
-
-      // Se existirem assentos já reservados, lançar um erro.
-      if (alreadyReservedSeats.length > 0) {
-        throw new Error(
-          `The following seats are already reserved: ${alreadyReservedSeats.join(", ")}`
-        );
-      }
 
       // Filtrar os assentos solicitados na reserva que não estão disponíveis.
       const invalidSeats = booking.seats.filter((seat) => {
@@ -164,6 +157,54 @@ function bookingService(bookingModel) {
       }
 
       throw new Error("Check for missing fields or wrong fields");
+    }
+  }
+
+  // Função para eliminar reserva caso pagamento não seja feito dentro de 5 minutos
+  async function checkingForPendingFiveMinutes(bookingId, paymentIntentId) {
+    console.log("Scheduling booking deletion in 5 minutes");
+    try {
+      setTimeout(async () => {
+        try {
+          const booking = await bookingModel.findById(bookingId);
+          if (!booking) {
+            throw new Error("Booking not found");
+          }
+  
+          // Verificar se o status do pagamento é "pending"
+          if (booking.paymentStatus === "pending") {
+            // Cancelar o PaymentIntent associado
+            if (paymentIntentId) {
+              await cancelPaymentIntent(paymentIntentId);
+            }
+  
+            // Atualização do status dos assentos reservados
+              const session = await sessionModel.findById(booking.session);
+              // Atualizar o status dos assentos reservados para "available"
+              session.seats = session.seats.map((row) =>
+                row.map((seat) => {
+                  if (booking.seats.includes(seat.seat)) {
+                    return { ...seat, status: "available" };
+                  }
+                  return seat;
+                })
+              );
+              await session.save();
+            
+
+            // Remover a reserva do banco de dados
+            await removeById(bookingId);
+            console.log("Booking deleted and PaymentIntent canceled");
+          }
+        } catch (error) {
+          console.error("Error deleting booking:", error);
+        }
+      }, 5 * 60 * 1000); // 5 minutos em milissegundos
+  
+      return { message: "Booking deletion scheduled in 5 minutes" };
+    } catch (error) {
+      console.error("Error scheduling booking deletion:", error);
+      throw new Error("Error scheduling booking deletion");
     }
   }
 
@@ -331,6 +372,9 @@ function bookingService(bookingModel) {
         ],
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
+
+      // Agendar a verificação de pagamento após 5 minutos
+      checkingForPendingFiveMinutes(booking._id, paymentIntent.id);
 
       return { url: paymentSession.url };
     } catch (error) {
@@ -602,6 +646,18 @@ function bookingService(bookingModel) {
     } catch (error) {
       console.error("Erro ao criar reembolso:", error);
       throw error;
+    }
+  }
+
+  // Função para cancelar um PaymentIntent
+  async function cancelPaymentIntent(paymentIntentId) {
+    try {
+      const paymentIntent = await stripe.paymentIntents.cancel(paymentIntentId);
+      console.log("PaymentIntent canceled:", paymentIntent.id);
+      return { message: "PaymentIntent canceled" };
+    } catch (error) {
+      console.error("Error canceling PaymentIntent:", error);
+      throw new Error("Error canceling PaymentIntent");
     }
   }
 
