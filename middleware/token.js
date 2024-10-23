@@ -1,7 +1,7 @@
 const Users = require("../data/users");
 const User = require("../data/users/user");
 
-module.exports = (req, res, next) => {
+function verifyTokenMiddleware(req, res, next) {
   const token = req.cookies.token || req.headers["authorization"];
 
   // Verifica se o token foi fornecido
@@ -26,4 +26,6 @@ module.exports = (req, res, next) => {
         return res.status(401).send({ auth: false, message: "Not authorized" });
       }
     });
-};
+}
+
+module.exports = verifyTokenMiddleware;

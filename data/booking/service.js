@@ -167,6 +167,8 @@ function bookingService(bookingModel) {
     }
   }
 
+  
+  // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
       // Buscar a sessão de pagamento no Stripe usando o sessionId
@@ -357,7 +359,7 @@ function bookingService(bookingModel) {
 
       // Lista para armazenar os bilhetes gerados
       const tickets = [];
-      const qrCodes = []; // Lista para armazenar os QR Codes gerados
+      
 
       // Para cada assento reservado, criar um bilhete separado
       for (const seat of populatedBooking.seats) {
@@ -397,7 +399,7 @@ function bookingService(bookingModel) {
           cinema: populatedBooking.session.room.cinema.name, // Nome do cinema
           seat: populatedTicket.seat, // Assento do bilhete
           startTime: populatedBooking.session.startTime, // Hora de início da sessão
-          totalAmount: populatedBooking.totalAmount, // Valor total da reserva
+          totalAmount: populatedBooking.session.price, // Valor de cada bilhete
           printedTime: populatedTicket.issuedAt, // Hora de emissão do bilhete
         };
 
@@ -411,9 +413,6 @@ function bookingService(bookingModel) {
           ticket: populatedTicket,
           qrCode: qrCode,
         });
-
-        // Adiciona o QR Code gerado na lista de QR Codes
-        qrCodes.push(qrCode);
       }
 
       // Retorna a lista de QR Codes gerados
