@@ -6,7 +6,6 @@ function MovieService(movieModel) {
   let service = {
     create,
     getMovieByTitleYearAndPlot,
-    getMoviesByGenre,
     findById,
     findAll,
     removeById,
@@ -94,36 +93,6 @@ function MovieService(movieModel) {
     } catch (error) {
       console.log(error)
       throw new Error(`Erro ao buscar o filme: ${error.message}`);
-    }
-  }
-
-  // Função para buscar filmes por género na API OMDb
-  async function getMoviesByGenre(genre) {
-    try {
-      const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
-        params: {
-          genre: genre,
-          apikey: MOVIE_API_KEY,
-        },
-      });
-
-      if (response.data.Response === "False") {
-        throw new Error(response.data.Error);
-      }
-
-      const moviesData = response.data.Search;
-
-      const movies = moviesData.map((movieData) => ({
-        title: movieData.Title,
-        year: movieData.Year,
-        imdbID: movieData.imdbID,
-        type: movieData.Type,
-        poster: movieData.Poster,
-      }));
-
-      return movies;
-    } catch (error) {
-      throw new Error(`Erro ao buscar os filmes: ${error.message}`);
     }
   }
 

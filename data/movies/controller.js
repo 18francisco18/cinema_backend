@@ -3,7 +3,6 @@ const movieModel = require("./movies"); // O modelo de filme
 
 const movieController = {
   searchMovie,
-  getMoviesByGenre,
   getMovieById,
   getAllMovies,
   removeMovie,
@@ -27,40 +26,6 @@ async function searchMovie(req, res) {
     //ESTA PARTE DE CÓDIGO LOGO EM BAIXO DO try E COLOCAR PARA PROCURAR NO MÉTODO findOne
     //O TÍTULO E O ANO(OPCIONAL) DO FILME
     const existingMovie = await movieModel.findOne({ imdbID: movie.imdbID });
-    if (existingMovie) {
-      console.log(
-        "Filme já existe no banco de dados, acedendo à base de dados..."
-      );
-      return res.status(200).send(existingMovie); // Se o filme já existe, retorna-o
-    }
-
-    // Se não existir, salva no banco de dados
-    const newMovie = await movieModel.create(movie);
-
-    res.status(201).send(newMovie); // Retorna o filme recém-salvo
-  } catch (error) {
-    res.status(400).send({ error: error.message }); // Em caso de erro, retorna a mensagem
-    console.log(error);
-  }
-}
-
-async function getMoviesByGenre(req, res) {
-  const { genre } = req.body; // Extrai o género da requisição
-
-  // Verifica se o género foi fornecido
-  if (!genre) {
-    return res.status(400).send({ error: "O género do filme é obrigatório" });
-  }
-
-  try {
-    // Chama o serviço que faz a requisição à OMDb API
-    const movies = await movieService.getMoviesByGenre(genre);
-
-    // Verifica se o filme já está no banco de dados
-    // ATENCAO- A API AINDA É USADA MESMO QUE VÁ BUSCAR AO BANCO DE DADOS. PARA CORRIGIR, COLOCAR
-    //ESTA PARTE DE CÓDIGO LOGO EM BAIXO DO try E COLOCAR PARA PROCURAR NO MÉTODO findOne
-    //O TÍTULO E O ANO(OPCIONAL) DO FILME
-    const existingMovie = await movieModel.findAll({ imdbID: movies.imdbID });
     if (existingMovie) {
       console.log(
         "Filme já existe no banco de dados, acedendo à base de dados..."

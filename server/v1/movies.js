@@ -10,8 +10,6 @@ function MoviesRouter() {
 
   router.post("/search", movieController.searchMovie);
 
-  router.post("/genre", movieController.getMoviesByGenre);
-
   router.get("/", movieController.getAllMovies);
 
   router.get("/:id", movieController.getMovieById);

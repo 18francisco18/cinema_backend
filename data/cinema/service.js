@@ -4,6 +4,7 @@ const Room = require("../rooms/rooms");
 const Movie = require("../movies/movies");
 const Session = require("../sessions/sessions");
 const Cinema = require("./cinema");
+const movieService = require("../movies");
 
 function cinemaService(cinemaModel) {
   let service = {
@@ -18,7 +19,7 @@ function cinemaService(cinemaModel) {
     occupyRoom,
     addMovie,
     removeMovie,
-    addMoviesToBillboard,
+    addMovieToBillboard,
     getAllCinemaMovies,
   };
 
@@ -221,45 +222,91 @@ function cinemaService(cinemaModel) {
   }
 
   // Adiciona múltiplos filmes ao cartaz de um cinema (usando POST)
-  async function addMoviesToBillboard(id, movies) {
+  async function addMovieToBillboard(id, movies) {
+    console.log("Searching Movie");
     try {
+      // Encontra o cinema pelo id
       const cinema = await cinemaModel.findById(id);
       if (!cinema) {
         throw new Error("Cinema not found");
       }
 
-      // Cria um array para armazenar os IDs dos filmes que serão adicionados
+      console.log("movies", movies);
+
+      // Array para armazenar os filmes a serem adicionados
       const moviesToAdd = [];
+  
+      // Para cada filme a ser adicionado
+      const title = movies.title;
+      const year = movies.year;
+      const plot = movies.plot;
 
-      // Itera sobre o array de IDs de filmes recebidos
-      for (let i = 0; i < movies.length; i++) {
-        const movie = await Movie.findById(movies[i]);
-        if (!movie) {
-          throw new Error(`Movie with ID ${movies[i]} not found`);
-        }
+      // Busca os detalhes do filme pela API OMDb usando título e ano
+      const movieDetails = await movieService.getMovieByTitleYearAndPlot(title, year, plot);
 
-        // Adiciona o ID do filme ao array apenas se ainda não estiver no cartaz
-        if (!cinema.movies.includes(movie._id)) {
-          moviesToAdd.push(movie._id);
-        }
+      if (!movieDetails) {
+        throw new Error("Movie not found");
+      }
+      
+      console.log("teste",movieDetails);
+
+      // Verifica se o filme já existe no banco de dados
+      let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
+
+      // Se o filme não existir, cria um novo
+      if (!movie) {
+        movie = new Movie({
+          title: movieDetails.title,
+          year: movieDetails.year,
+          rated: movieDetails.rated,
+          released: movieDetails.released,
+          runtime: movieDetails.runtime,
+          genre: movieDetails.genre,
+          director: movieDetails.director,
+          writer: movieDetails.writer,
+          actors: movieDetails.actors,
+          plot: movieDetails.plot,
+          language: movieDetails.language,
+          country: movieDetails.country,
+          awards: movieDetails.awards,
+          poster: movieDetails.poster,
+          ratings: movieDetails.ratings,
+          metascore: movieDetails.metascore,
+          imdbRating: movieDetails.imdbRating,
+          imdbVotes: movieDetails.imdbVotes,
+          imdbID: movieDetails.imdbID,
+          type: movieDetails.type,
+          dvd: movieDetails.dvd,
+          boxOffice: movieDetails.boxOffice,
+          production: movieDetails.production,
+          website: movieDetails.website,
+          response: movieDetails.response,
+        });
+
+        await movie.save();
       }
 
-      // Adiciona os novos filmes ao array de filmes existentes
+      // Adiciona o filme ao array de filmes a serem adicionados
+
+      if (!cinema.movies.includes(movie._id)) {
+        moviesToAdd.push(movie._id);
+      }
+      
+      // Adiciona os filmes ao cartaz do cinema
       cinema.movies.push(...moviesToAdd);
       await cinema.save();
-
-      return cinema;
+      console.log("Updated cinema movies:", cinema.movies);
+  
+      return cinema.movies;
     } catch (err) {
-      if (
-        err.message === "Cinema not found" ||
-        err.message.startsWith("Movie with ID")
-      ) {
+      if (err.message === "Cinema not found" || err.message.startsWith("Movie with ID")) {
         throw err;
       }
+      console.log(err);
       throw new Error("Erro ao adicionar filmes ao cinema");
     }
   }
-
+  
   // Busca todos os filmes de um cinema
   async function getAllCinemaMovies(id) {
     try {

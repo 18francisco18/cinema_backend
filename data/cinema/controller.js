@@ -180,8 +180,11 @@ async function addMoviesToBillboard(req, res) {
     try {
         const { id } = req.params;
         const { movies } = req.body;
+
+        console.log("Cinema ID:", id);
+        console.log("Movies to add:", movies);
         
-        const cinema = await cinemaService.addMoviesToBillboard(id, movies);
+        const cinema = await cinemaService.addMovieToBillboard(id, movies);
         if (!cinema) {
             res.status(404).json({ error: "Cinema not found" });
         } else {
