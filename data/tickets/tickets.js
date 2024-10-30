@@ -9,7 +9,7 @@ const ticketSchema = new Schema({
   seat: { type: String, required: true },
   status: {
     type: String,
-    enum: ["booked", "used", "cancelled"],
+    enum: ["booked", "used", "cancelled", "refunded"],
     default: "booked",
   },
   qrCode: { type: String },

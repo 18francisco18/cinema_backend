@@ -14,9 +14,10 @@ const bookingSchema = new Schema({
     totalAmount: { type: Number, required: true }, // Valor total da reserva
     paymentStatus: {
         type: String,
-        enum: ["paid", "pending", "cancelled"],
+        enum: ["paid", "pending", "cancelled", "refunded"],
         default: "pending"
     },
+    paymentIntentId: { type: String, required: false}, // ID do pagamento no Stripe
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);

@@ -2,6 +2,7 @@ const bodyParser = require("body-parser");
 const express = require("express");
 const bookingController = require("../../data/booking/controller");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const bookingService = require("../../data/booking");
 
 function BookingRouter() {
   let router = express();
@@ -28,6 +29,27 @@ function BookingRouter() {
 
       // Manipular o evento de acordo com o tipo
       switch (event.type) {
+        case "payment_intent.created":
+          const paymentIntentCreated = event.data.object;
+          console.log("bookingId:", paymentIntentCreated.metadata.bookingId);
+          console.log("paymentIntentId:", paymentIntentCreated.id);
+
+          // Encontrar o booking associado ao paymentIntentId
+          const booking = await bookingService.findById(
+            paymentIntentCreated.metadata.bookingId
+          );
+          if (!booking) {
+            console.error(
+              "Booking não encontrado para o paymentIntentId:",
+              paymentIntentCreated.id
+            );
+            return res.status(404).send("Booking não encontrado");
+          }
+
+          booking.paymentIntentId = paymentIntentCreated.id;
+          await booking.save();
+          break;
+
         case "checkout.session.completed":
           const session = event.data.object;
           console.log("session:", session);
@@ -67,7 +89,7 @@ function BookingRouter() {
   router.get("/findAll", bookingController.getAllBookings);
   router.delete("/remove/:id", bookingController.removeBookingById);
   router.put("/update/:id", bookingController.updateBookingById);
-  router.post("/:id/refund", bookingController.refundBooking);
+  router.post("/:id/cancelReservation", bookingController.cancelReservation);
 
   return router;
 }
