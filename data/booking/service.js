@@ -34,6 +34,7 @@ function bookingService(bookingModel) {
     handlePaymentConfirmation,
     cancelReservation,
     refundPayment,
+    refundTickets,
   };
 
   async function create(booking, sessionId) {
@@ -404,6 +405,7 @@ function bookingService(bookingModel) {
 
       // Lista para armazenar os bilhetes gerados
       const tickets = [];
+      const ticketIds = [];
       
 
       // Para cada assento reservado, criar um bilhete separado
@@ -458,6 +460,9 @@ function bookingService(bookingModel) {
           ticket: populatedTicket,
           qrCode: qrCode,
         });
+        
+        ticketIds.push(populatedTicket._id);
+        booking.tickets = ticketIds;
       }
 
       // Retorna a lista de QR Codes gerados
@@ -688,36 +693,86 @@ function bookingService(bookingModel) {
     }
   }
 
-  async function refundTicket(ticketId) {
+  // Função para reembolsar um ou mais bilhetes individuais de um booking
+  async function refundTickets(bookingId, ticketIds) {
     try {
-      // Buscar o bilhete e garantir que ele ainda não foi reembolsado
-      const ticket = await ticketModel.findById(ticketId).populate("booking");
-      if (!ticket || ticket.status === "refunded") {
-        throw new Error("Ticket already refunded or not found");
-      }
+      // Verificar o booking e garantir que ele foi pago
+      const booking = await bookingModel.findById(bookingId);
+      if (!booking) throw new Error("Booking not found");
 
-      // Buscar a reserva e verificar se o pagamento foi feito
-      const booking = ticket.booking;
       if (booking.paymentStatus !== "paid") {
-        throw new Error("Booking is not paid, cannot refund ticket");
+        throw new Error("Booking not eligible for partial refunds");
       }
 
-      // Processar o reembolso parcial via Stripe
-      const refundAmount = booking.totalAmount / booking.seats.length; // Valor proporcional para um bilhete
+
+      console.log("IDs de tickets recebidos:", ticketIds);
+      console.log("ID de booking:", bookingId);
+
+      // Encontrar apenas os bilhetes relevantes diretamente no modelo ticket
+      const ticketsToRefund = await ticketModel.find({
+        _id: { $in: ticketIds },
+        booking: bookingId,
+        status: { $nin: ["refunded", "cancelled", "used"] },
+      });
+
+
+      console.log("Tickets encontrados para reembolso:", ticketsToRefund);
+
+      if (ticketsToRefund.length === 0) {
+        throw new Error("No tickets found for refund or already refunded");
+      }
+
+      const chargeId = paymentIntent.latest_charge;
+      const charge = await stripe.charges.retrieve(chargeId);
+      console.log("Charge:", charge);
+      const balanceTransactionId = charge.balance_transaction;
+      const balanceTransaction = await stripe.balanceTransactions.retrieve(
+        balanceTransactionId
+      );
+
+      // Obter o valor líquido da transação para calcular o reembolso
+      const netAmount = balanceTransaction.net;
+
+      // Calcular o valor total do reembolso para os bilhetes elegíveis
+      const refundAmount =
+        (booking.totalAmount / booking.seats.length) * ticketsToRefund.length * 100;
+
+      // Processar o reembolso total via Stripe
       await refundPayment(booking.paymentIntentId, refundAmount);
 
-      // Atualizar o bilhete e a reserva
-      ticket.status = "refunded";
-      ticket.refundedAt = new Date();
-      await ticket.save();
+      // Atualizar o status dos bilhetes de forma otimizada com um único comando
+      const ticketUpdates = ticketsToRefund.map((ticket) => ({
+        updateOne: {
+          filter: { _id: ticket._id },
+          update: { status: "refunded", refundedAt: new Date() },
+        },
+      }));
+      await ticketModel.bulkWrite(ticketUpdates);
 
-      console.log(`Ticket ${ticketId} refunded successfully`);
-      return { message: "Ticket refunded successfully", refund };
+      // Libertar os assentos reservados na sessão
+      const seatNumbers = ticketsToRefund.map((ticket) => ticket.seatNumber);
+      booking.session.seats = booking.session.seats.map((row) =>
+        row.map((seat) => {
+          if (seatNumbers.includes(seat.seat)) {
+            return { ...seat, status: "available" };
+          }
+          return seat;
+        })
+      );
+
+      await booking.session.save(); // Salvar a sessão com os assentos atualizados
+
+      console.log(`Tickets refunded successfully: ${ticketIds}`);
+      return {
+        message: "Tickets refunded successfully",
+        refundedTickets: ticketIds,
+      };
     } catch (error) {
-      console.error("Error refunding ticket:", error);
-      throw new Error("Failed to refund ticket");
+      console.error("Error refunding tickets:", error);
+      throw new Error("Failed to refund tickets");
     }
   }
+
 
   // Função para reembolsar um pagamento por stripe
   async function refundPayment(paymentIntentId, amount = null) {

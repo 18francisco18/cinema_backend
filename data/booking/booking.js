@@ -18,6 +18,7 @@ const bookingSchema = new Schema({
         default: "pending"
     },
     paymentIntentId: { type: String, required: false}, // ID do pagamento no Stripe
+    tickets: [{ type: Schema.Types.ObjectId, ref: 'Ticket' }] // Lista de ingressos
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);

@@ -8,7 +8,7 @@ const bookingController = {
     updateBookingById,
     handlePaymentConfirmation,
     cancelReservation,
-
+    refundTicketsFromBooking,
 }
 
 
@@ -106,6 +106,17 @@ async function cancelReservation(req, res) {
             res.status(500).json({ error: "Internal Server Error" });
         }
     }
+}
+
+async function refundTicketsFromBooking(req, res) {
+  try {
+    const { bookingId } = req.params;
+    const { ticketIds } = req.body;
+    await bookingService.refundTickets(bookingId, ticketIds);
+    res.status(200).send();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 

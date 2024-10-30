@@ -90,6 +90,7 @@ function BookingRouter() {
   router.delete("/remove/:id", bookingController.removeBookingById);
   router.put("/update/:id", bookingController.updateBookingById);
   router.post("/:id/cancelReservation", bookingController.cancelReservation);
+  router.post("/:bookingId/refundTickets", bookingController.refundTicketsFromBooking);
 
   return router;
 }
