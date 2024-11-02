@@ -2,8 +2,9 @@ const bookingService = require('../booking');
 
 const bookingController = {
     createBooking,
+    findAllBookings,
+    findAllBookingsForSession,
     getBookingById,
-    getAllBookings,
     removeBookingById,
     updateBookingById,
     handlePaymentConfirmation,
@@ -27,6 +28,30 @@ async function createBooking(req, res) {
     }
 }
 
+async function findAllBookings(req, res) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await bookingService.findAll(page, limit);
+    res.status(200).send(result);
+  } catch (error) {
+    res.status(500).send({ error: "Error fetching bookings" });
+  }
+}
+
+async function findAllBookingsForSession(req, res) {
+    try {
+        const { sessionId } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const result = await bookingService.findAllBookingsForSession(sessionId, page, limit);
+        res.status(200).send(result);
+    } catch (error) {
+        res.status(500).send({ error: "Error fetching bookings" });
+    }
+}
+
+
 // Controlador para buscar uma reserva pelo id
 async function getBookingById(req, res) {
     try {
@@ -42,14 +67,6 @@ async function getBookingById(req, res) {
     }
 }
 
-async function getAllBookings(req, res) {
-    try {
-        const bookings = await bookingService.findAll();
-        res.status(200).send(bookings);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-}
 
 // Controlador para remover uma reserva pelo id
 async function removeBookingById(req, res) {

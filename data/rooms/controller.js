@@ -42,7 +42,9 @@ async function getRoomById(req, res) {
 // Controlador para buscar todas as salas
 async function getAllRooms(req, res) {
   try {
-    const rooms = await roomService.findAll();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const rooms = await roomService.findAll(page, limit);
     res.status(200).send(rooms);
   } catch (error) {
     console.log(error);

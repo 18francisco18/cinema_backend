@@ -86,11 +86,12 @@ function BookingRouter() {
   // Outras rotas normais
   router.post("/:id/create", bookingController.createBooking);
   router.get("/find/:id", bookingController.getBookingById);
-  router.get("/findAll", bookingController.getAllBookings);
+  router.get("/findAll", bookingController.findAllBookings);
   router.delete("/remove/:id", bookingController.removeBookingById);
   router.put("/update/:id", bookingController.updateBookingById);
   router.post("/:id/cancelReservation", bookingController.cancelReservation);
   router.post("/:bookingId/refundTickets", bookingController.refundTicketsFromBooking);
+  router.get("/:sessionId/findAll", bookingController.findAllBookingsForSession);
 
   return router;
 }
