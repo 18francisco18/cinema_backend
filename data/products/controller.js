@@ -5,6 +5,7 @@ const productsController = {
     findAllProducts,
     findProductById,
     removeProductById,
+    createCategory,
 }
 
 async function createProduct(req, res, next) {
@@ -46,6 +47,16 @@ async function removeProductById(req, res, next) {
         const { id } = req.params;
         await productsService.removeProductById(id);
         res.status(204).send({ message: 'Product deleted'});
+    } catch (error) {
+        console.log(error);
+        next(error)
+    }
+}
+
+async function createCategory(req, res, next) {
+    try {
+        const category = await productsService.createCategory(req.body);
+        res.status(201).json(category);
     } catch (error) {
         console.log(error);
         next(error)

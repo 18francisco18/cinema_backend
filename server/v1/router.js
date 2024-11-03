@@ -1,4 +1,3 @@
-
 let UsersAPI = require("./auth");
 let MoviesAPI = require("./movies");
 const express = require("express");
@@ -9,6 +8,8 @@ let BookingAPI = require("./booking");
 let PasswordAPI = require("./password");
 let SessionsAPI = require("./sessions");
 let TicketsAPI = require("./tickets");
+let ProductsAPI = require("./products");
+let CategoriesAPI = require("./categories");
 
 function init() {
   let api = express();
@@ -22,6 +23,8 @@ function init() {
   api.use("/bookings", BookingAPI());
   api.use("/sessions", SessionsAPI());
   api.use("/tickets", TicketsAPI());
+  api.use("/products", ProductsAPI());
+  api.use("/products/categories", CategoriesAPI());
 
   return api;
 }

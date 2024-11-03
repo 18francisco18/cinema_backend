@@ -69,10 +69,6 @@ class AppError extends Error {
         NETWORK_AUTHENTICATION_REQUIRED: 511
     };
 
-    static commonErrors404 = {
-        errorName: 'Resource not found',
-        errorHttpCode: AppError.HttpCode.NOT_FOUND
-    };
 
     // Construtor da classe, para criar uma instância de AppError com os
     // atributos name, httpCode, description e isOperational
