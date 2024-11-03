@@ -20,6 +20,9 @@ function cinemaService(cinemaModel) {
     findRoomsById,
     removeRoom,
     addMovieToBillboard,
+    addMoviesToBillboards,
+    removeMovie,
+    //removeMovies,
     getAllCinemaMovies,
   };
 
@@ -217,10 +220,6 @@ function cinemaService(cinemaModel) {
       // Verifica se o filme já existe no banco de dados
       let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
 
-      if (movie) {
-        throw new ConflictError(`Movie with ID ${movieDetails.imdbID} already exists`);
-      }
-
       // Se o filme não existir, cria um novo
       if (!movie) {
         movie = new Movie({
@@ -271,6 +270,159 @@ function cinemaService(cinemaModel) {
       throw err;
     }
   }
+
+  // Adiciona múltiplos filmes ao cartaz de todos os cinemas (usando POST)
+  async function addMoviesToBillboards(movies) {
+    try {
+      // Array para armazenar os filmes a serem adicionados
+      const moviesToAdd = [];
+
+      // Para cada filme a ser adicionado
+      for (let i = 0; i < movies.length; i++) {
+        const title = movies[i].title;
+        const year = movies[i].year;
+        const plot = movies[i].plot;
+
+        // Busca os detalhes do filme pela API OMDb usando título e ano
+        const movieDetails = await movieService.getMovieByTitleYearAndPlot(
+          title,
+          year,
+          plot
+        );
+
+        if (!movieDetails) {
+          throw new NotFoundError("Movie not found");
+        }
+
+        // Verifica se o filme já existe no banco de dados
+        let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
+
+        if (movie) {
+          throw new ConflictError(`Movie with ID ${movieDetails.imdbID} already exists`);
+        }
+
+        // Se o filme não existir, cria um novo
+        if (!movie) {
+          movie = new Movie({
+          title: movieDetails.title,
+          year: movieDetails.year,
+          rated: movieDetails.rated,
+          released: movieDetails.released,
+          runtime: movieDetails.runtime,
+          genre: movieDetails.genre,
+          director: movieDetails.director,
+          writer: movieDetails.writer,
+          actors: movieDetails.actors,
+          plot: movieDetails.plot,
+          language: movieDetails.language,
+          country: movieDetails.country,
+          awards: movieDetails.awards,
+          poster: movieDetails.poster,
+          ratings: movieDetails.ratings,
+          metascore: movieDetails.metascore,
+          imdbRating: movieDetails.imdbRating,
+          imdbVotes: movieDetails.imdbVotes,
+          imdbID: movieDetails.imdbID,
+          type: movieDetails.type,
+          dvd: movieDetails.dvd,
+          boxOffice: movieDetails.boxOffice,
+          production: movieDetails.production,
+          website: movieDetails.website,
+          response: movieDetails.response,
+          });
+
+          await movie.save();
+        }
+
+        // Adiciona o filme ao array de filmes a serem adicionados
+        moviesToAdd.push(movie._id);
+      }
+
+      // Adiciona os filmes ao cartaz de todos os cinemas
+      const cinemas = await cinemaModel.find();
+      for (let i = 0; i < cinemas.length; i++) {
+        cinemas[i].movies.push(...moviesToAdd);
+        await cinemas[i].save();
+      }
+
+      return moviesToAdd;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  //Remover um filme do cartaz de um cinema
+  async function removeMovie(id, movieId) {
+    try {
+      // Encontra o cinema pelo id
+      const cinema = await cinemaModel.findById(id);
+      if (!cinema) {
+        throw new NotFoundError("Cinema not found");
+      }
+
+      // Verifica se o filme existe no cartaz do cinema
+      if (!cinema.movies.includes(movieId)) {
+        throw new NotFoundError("Movie not found in cinema");
+      }
+
+      // Remove o filme do cartaz do cinema
+      cinema.movies.pull(movieId);
+      await cinema.save();
+      console.log("Updated cinema movies:", cinema.movies);
+
+      return cinema;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  // Remover filmes de todos os cinemas
+  /*async function removeMovies(movies) {
+    try {
+      // Array para armazenar os filmes a serem removidos
+      const moviesToRemove = [];
+  
+      // Para cada filme a ser removido
+      for (let i = 0; i < movies.length; i++) {
+        const movie = movies[i];
+        console.log("Movie object:", movie); // Adicione este log para verificar a estrutura do objeto de filme
+  
+        const id = movie.id;
+        console.log("Movie ID:", id); // Adicione este log para verificar o valor do campo `_id`
+  
+        // Busca os detalhes do filme pelo ID
+        const movieDetails = await movieService.findById(id);
+  
+        if (!movieDetails) {
+          throw new Error("Movie not found");
+        }
+  
+        // Verifica se o filme já existe no banco de dados
+        let movieInDb = await Movie.findOne({ imdbID: movieDetails.imdbID });
+  
+        if (!movieInDb) {
+          throw new Error(`Movie with ID ${movieDetails.imdbID} not found`);
+        }
+  
+        // Adiciona o filme ao array de filmes a serem removidos
+        moviesToRemove.push(movieInDb._id);
+      }
+  
+      // Remove os filmes de todos os cinemas
+      const cinemas = await cinemaModel.find();
+      for (let i = 0; i < cinemas.length; i++) {
+        cinemas[i].movies.pull(...moviesToRemove);
+        await cinemas[i].save();
+      }
+  
+      return moviesToRemove;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }*/
 
   // Busca todos os filmes de um cinema
   async function getAllCinemaMovies(id) {

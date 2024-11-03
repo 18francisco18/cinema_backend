@@ -9,9 +9,10 @@ const cinemaController = {
     findCinemaRoomsById,
     removeCinemaRoomById,
     removeCinemaById,
-    removeMovieFromCinema,
     addMoviesToBillboard,
     addMoviesToBillboards,
+    removeMovieFromCinema,
+    //removeMovieFromBillboards,
     getAllCinemaMovies,
 }
 
@@ -97,7 +98,7 @@ async function removeCinemaById(req, res, next) {
     }
 }
 
-
+// Controlador para adicionar filmes ao cartaz de um cinema.
 async function addMoviesToBillboard(req, res, next) {
     try {
         const { id } = req.params;
@@ -108,6 +109,40 @@ async function addMoviesToBillboard(req, res, next) {
         next(error);
     }
 }
+
+// Controlador para adicionar filmes a todos os cartazes de todos os cinemas.
+async function addMoviesToBillboards(req, res, next) {
+    try {
+        const { movies } = req.body;
+        const cinemas = await cinemaService.addMoviesToBillboards(movies);
+        res.status(200).send(cinemas);
+    } catch (error) {
+        next(error);
+    }
+}
+
+// Controlador para remover um filme de um cinema.
+async function removeMovieFromCinema(req, res, next) {
+    try {
+        const { id, movieId } = req.params;
+        const cinema = await cinemaService.removeMovie(id, movieId);
+        res.status(200).send(cinema);
+    } catch (error) {
+        next(error)
+    }
+}
+
+// Controlador para remover filmes de todos os cartazes de todos os cinemas.
+/*async function removeMovieFromBillboards(req, res, next) {
+    try {
+        const { movies } = req.body;
+        const cinemas = await cinemaService.removeMovies(movies);
+        res.status(200).send(cinemas);
+    }
+    catch (error) {
+        next(error)
+    }
+}*/
 
 async function getAllCinemaMovies(req, res, next) {
     try {
