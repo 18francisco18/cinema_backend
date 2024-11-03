@@ -10,6 +10,7 @@ const cinemaSchema = new Schema({
     rooms: [{ type: Schema.Types.ObjectId, ref: 'Room' }],
 });
 
+
 // Middleware para remover salas associadas quando um cinema é deletado
 cinemaSchema.pre("findOneAndDelete", async function (next) {
   // Verifica se a função que está a ser chamada é a de remover um cinema pelo id

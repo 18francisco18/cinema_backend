@@ -5,6 +5,7 @@ const cron = require("node-cron");
 const CORS = require("cors");
 const sessionService = require("./data/sessions");
 const apiVersion = process.env.API_VERSION || 'v1';
+const errorHandler = require(`./middleware/errorHandler`);
 
 const config = require("./config");
 
@@ -39,6 +40,7 @@ cron.schedule('*/5 * * * *', () => {
   sessionService.deleteSessions();
 });
 
+app.use(errorHandler)
 const server = http.Server(app);
 
 server.listen(port, hostname, () => {

@@ -48,10 +48,19 @@ function RoomService(roomModel) {
     }
 
     // Encontra todas as salas
-    async function findAll() {
+    async function findAll(page = 1, limit = 10) {
         try {
-            const rooms = await roomModel.find();
-            return rooms;
+
+            const skip = (page - 1) * limit;
+            const rooms = await roomModel.find().skip(skip).limit(limit);
+            const total = await roomModel.countDocuments();
+
+            return {
+                rooms,
+                page,
+                total,
+                pages: Math.ceil(total / limit),
+            };
         } catch (err) {
             throw new Error("Error fetching rooms");
         }

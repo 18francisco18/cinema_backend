@@ -8,6 +8,7 @@ const seatStatus = require("../sessions/seatStatus");
 const sessionStatus = require("../sessions/sessionStatus");
 const nodeMailer = require("nodemailer");
 const dotenv = require("dotenv");
+const Session = require("../sessions/sessions");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
@@ -29,9 +30,12 @@ function bookingService(bookingModel) {
     findAll,
     removeById,
     updateById,
+    findByIdAndUpdate,
     handlePaymentConfirmation,
     cancelReservation,
     refundPayment,
+    refundTickets,
+    findAllBookingsForSession,
   };
 
   async function create(booking, sessionId) {
@@ -40,7 +44,9 @@ function bookingService(bookingModel) {
 
     try {
       // Buscar a sessão associada à reserva com a transação.
-      const sessionData = await sessionModel.findById(sessionId).session(session);
+      const sessionData = await sessionModel
+        .findById(sessionId)
+        .session(session);
 
       // Caso a sessão não exista, lançar um erro.
       if (!sessionData) {
@@ -79,7 +85,9 @@ function bookingService(bookingModel) {
       // Se existirem assentos inválidos, lançar um erro.
       if (invalidSeats.length > 0) {
         throw new Error(
-          `The following seats are invalid or unavailable: ${invalidSeats.join(", ")}`
+          `The following seats are invalid or unavailable: ${invalidSeats.join(
+            ", "
+          )}`
         );
       }
 
@@ -118,12 +126,12 @@ function bookingService(bookingModel) {
 
       console.log("Session updated with reserved seats");
 
-      // Criar a sessão de pagamento no Stripe.
-      const paymentConfirmation = await createPaymentSession(savedBooking);
-
       // Confirmar a transação.
       await session.commitTransaction(); // Confirmar a transação.
-      session.endSession(); // Encerrar a sessão.
+      session.endSession(); // Encerrar a sessão.~
+
+      // Criar a sessão de pagamento no Stripe.
+      const paymentConfirmation = await createPaymentSession(savedBooking);
 
       // Retornar a reserva.
       return { booking: savedBooking, paymentUrl: paymentConfirmation.url };
@@ -152,7 +160,9 @@ function bookingService(bookingModel) {
         throw new Error("Cannot book a session in the past");
       }
 
-      if (error.message.includes("The following seats are invalid or unavailable")) {
+      if (
+        error.message.includes("The following seats are invalid or unavailable")
+      ) {
         throw new Error(error.message);
       }
 
@@ -170,27 +180,26 @@ function bookingService(bookingModel) {
           if (!booking) {
             throw new Error("Booking not found");
           }
-  
+
           // Verificar se o status do pagamento é "pending"
           if (booking.paymentStatus === "pending") {
             // Cancelar o PaymentIntent associado
             if (paymentIntentId) {
               await cancelPaymentIntent(paymentIntentId);
             }
-  
+
             // Atualização do status dos assentos reservados
-              const session = await sessionModel.findById(booking.session);
-              // Atualizar o status dos assentos reservados para "available"
-              session.seats = session.seats.map((row) =>
-                row.map((seat) => {
-                  if (booking.seats.includes(seat.seat)) {
-                    return { ...seat, status: "available" };
-                  }
-                  return seat;
-                })
-              );
-              await session.save();
-            
+            const session = await sessionModel.findById(booking.session);
+            // Atualizar o status dos assentos reservados para "available"
+            session.seats = session.seats.map((row) =>
+              row.map((seat) => {
+                if (booking.seats.includes(seat.seat)) {
+                  return { ...seat, status: "available" };
+                }
+                return seat;
+              })
+            );
+            await session.save();
 
             // Remover a reserva do banco de dados
             await removeById(bookingId);
@@ -200,7 +209,7 @@ function bookingService(bookingModel) {
           console.error("Error deleting booking:", error);
         }
       }, 5 * 60 * 1000); // 5 minutos em milissegundos
-  
+
       return { message: "Booking deletion scheduled in 5 minutes" };
     } catch (error) {
       console.error("Error scheduling booking deletion:", error);
@@ -208,7 +217,6 @@ function bookingService(bookingModel) {
     }
   }
 
-  
   // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
@@ -248,7 +256,8 @@ function bookingService(bookingModel) {
         const tickets = await generateQRCode(booking);
 
         // Gerar a lista de QR codes e assentos para incluir no e-mail
-        const qrCodeImages = tickets.map((ticket) => {
+        const qrCodeImages = tickets
+          .map((ticket) => {
             return `
           <p><strong>Seat:</strong> ${ticket.ticket.seat}</p>
           <img src="${ticket.qrCode}" alt="QR Code for seat ${ticket.ticket.seat}" />
@@ -328,41 +337,34 @@ function bookingService(bookingModel) {
         throw new Error("User not found");
       }
 
-      // Primeiro, criar o PaymentIntent com a metadata
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: session.price * 100 * booking.seats.length,
-        currency: "eur",
+      // Criar a sessão de pagamento no Stripe
+      const paymentSession = await stripe.checkout.sessions.create({
         payment_method_types: [
           "card", // Cartão de crédito/débito
           "multibanco", // Para Multibanco (Portugal)
         ],
-        metadata: {
-          bookingId: booking._id.toString(),
-          userId: booking.user._id.toString(),
-          sessionId: booking.session._id.toString(),
-          movieId: session.movie._id.toString(),
-          roomId: session.room._id.toString(),
-        },
-      });
-
-      // Criar a sessão de checkout associando o PaymentIntent recém-criado
-      const paymentSession = await stripe.checkout.sessions.create({
         payment_intent_data: {
-          metadata: paymentIntent.metadata,
+          metadata: {
+            bookingId: booking._id.toString(),
+            userId: booking.user._id.toString(),
+            sessionId: booking.session._id.toString(),
+            movieId: session.movie._id.toString(),
+            roomId: session.room._id.toString(),
+          },
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
         line_items: [
           {
             price_data: {
-              currency: "eur", // A mesma moeda
+              currency: "eur",
               product_data: {
                 name: `Movie Ticket for ${session.movie.title}`,
                 description: `
-                  Seats: ${booking.seats.join(", ")}
-                  Room: ${session.room.name}
-                  Cinema: ${session.room.cinema.name}
-                `,
+                Seats: ${booking.seats.join(", ")}
+                Room: ${session.room.name}
+                Cinema: ${session.room.cinema.name}
+              `,
                 images: [session.movie.poster], // URL da imagem do pôster do filme
               },
               unit_amount: session.price * 100, // Preço unitário por ingresso em centavos
@@ -374,7 +376,7 @@ function bookingService(bookingModel) {
       });
 
       // Agendar a verificação de pagamento após 5 minutos
-      checkingForPendingFiveMinutes(booking._id, paymentIntent.id);
+      checkingForPendingFiveMinutes(booking._id, paymentSession.payment_intent);
 
       return { url: paymentSession.url };
     } catch (error) {
@@ -403,7 +405,7 @@ function bookingService(bookingModel) {
 
       // Lista para armazenar os bilhetes gerados
       const tickets = [];
-      
+      const ticketIds = [];
 
       // Para cada assento reservado, criar um bilhete separado
       for (const seat of populatedBooking.seats) {
@@ -457,6 +459,9 @@ function bookingService(bookingModel) {
           ticket: populatedTicket,
           qrCode: qrCode,
         });
+
+        ticketIds.push(populatedTicket._id);
+        booking.tickets = ticketIds;
       }
 
       // Retorna a lista de QR Codes gerados
@@ -481,11 +486,7 @@ function bookingService(bookingModel) {
 
   async function findById(id) {
     try {
-      const booking = await bookingModel
-        .findById(id)
-        .populate("user")
-        .populate("room")
-        .populate("session");
+      const booking = await bookingModel.findById(id);
       if (!booking) {
         throw new Error("Booking not found");
       }
@@ -498,13 +499,62 @@ function bookingService(bookingModel) {
     }
   }
 
-  // Encontra todas as reservas
-  async function findAll() {
+  async function findByIdAndUpdate(id) {
     try {
-      const bookings = await bookingModel.find();
-      return bookings;
+      const booking = await bookingModel.findByIdAndUpdate(id);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+    } catch (error) {
+      if (error.message === "Booking not found") {
+        throw error;
+      }
+      throw new Error("Error updating booking");
+    }
+  }
+
+  // Encontra todas as reservas com paginação
+  async function findAll(page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+      const bookings = await bookingModel.find().skip(skip).limit(limit);
+      const total = await bookingModel.countDocuments();
+
+      return {
+        bookings,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      };
     } catch (err) {
       throw new Error("Error fetching bookings");
+    }
+  }
+
+  // Encontra todas as reservas para uma sessão
+  async function findAllBookingsForSession(sessionId, page = 1, limit = 10) {
+    try {
+      const session = await Session.findById(sessionId);
+
+      if (!session) {
+        throw new Error("Session not found");
+      }
+
+      const skip = (page - 1) * limit;
+      const total = await bookingModel.countDocuments();
+      const booking = await bookingModel.find({ session: sessionId }).skip(skip).limit(limit);
+      if (!booking) {
+        throw new Error("Booking not found");
+      }
+
+      return {
+        booking,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      throw new Error("Error");
     }
   }
 
@@ -543,34 +593,45 @@ function bookingService(bookingModel) {
 
   // Função para cancelar uma reserva
   // Necessário verificar utilizador.
-  async function cancelReservation(paymentIntentId) {
+  async function cancelReservation(bookingId) {
     try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId
-      );
-      if (!paymentIntent) {
-        throw new Error("Payment Intent não encontrado");
-      }
-
-      // Verificar se o bookingId está presente nos metadados do PaymentIntent
-      const bookingId = paymentIntent.metadata
-        ? paymentIntent.metadata.bookingId
-        : null;
-      if (!bookingId) {
-        throw new Error("Booking ID não encontrado nos metadados");
-      }
-
       // Buscar a reserva com o ID fornecido
       const booking = await bookingModel
         .findById(bookingId)
         .populate("session");
+
       if (!booking) {
         throw new Error("Booking not found");
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        booking.paymentIntentId
+      );
+      console.log("PaymentIntent:", paymentIntent);
+
+      if (!paymentIntent) {
+        throw new Error("Payment Intent não encontrado");
       }
 
       // Verificar se a reserva já foi cancelada
       if (booking.status === "cancelled") {
         throw new Error("Booking is already cancelled");
+      }
+
+      if (booking.status === "completed") {
+        throw new Error("Booking completed");
+      }
+
+      if (booking.paymentStatus === "refunded") {
+        throw new Error("Booking refunded");
+      }
+
+      if (booking.paymentStatus === "pending") {
+        throw new Error("Cannot refund when payment didnt go through");
+      }
+
+      if (booking.paymentStatus === "cancelled") {
+        throw new Error("Unnable to refund");
       }
 
       const currentTime = Date.now();
@@ -580,38 +641,53 @@ function bookingService(bookingModel) {
 
       // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
       // para calcular o reembolso.
-      const balanceTransactionId =
-        paymentIntent.charges.data[0].balance_transaction;
+      const chargeId = paymentIntent.latest_charge;
+      const charge = await stripe.charges.retrieve(chargeId);
+      console.log("Charge:", charge);
+      const balanceTransactionId = charge.balance_transaction;
       const balanceTransaction = await stripe.balanceTransactions.retrieve(
         balanceTransactionId
       );
+
+      // Obter o valor líquido da transação para calcular o reembolso
       const netAmount = balanceTransaction.net;
 
+      // Verificar se a reserva foi feita há mais de 2 horas
       if (sessionStartTime - currentTime > twoHoursInMillis) {
         try {
-          await refundPayment(paymentIntentId, netAmount);
+          console.log(
+            "Reembolsando pagamento completo:",
+            booking.paymentIntentId,
+            netAmount
+          );
+          await refundPayment(booking.paymentIntentId, netAmount);
         } catch (error) {
           console.error("Erro ao reembolsar pagamento:", error);
           throw new Error("Erro ao reembolsar pagamento");
         }
       } else if (
+        // Verificar se a reserva foi feita há menos de 2 horas e mais de 30 minutos
         sessionStartTime - currentTime <=
         twoHoursInMillis >
         thirtyMinutesInMillis
       ) {
         try {
-          await refundPayment(paymentIntentId, netAmount / 2);
+          await refundPayment(booking.paymentIntentId, netAmount / 2);
         } catch (error) {
           console.error("Erro ao reembolsar pagamento:", error);
           throw new Error("Erro ao reembolsar pagamento");
         }
+        // Se o pedido de reembolso for feito após 30 minutos antes do início da sessão,
+        // não é possível reembolsar o pagamento.
       } else {
         throw new Error("Não é possível reembolsar a reserva");
       }
 
+      // Atualizar o status da reserva para "cancelado" e o status do pagamento para "reembolsado"
       const bookingUpdate = await bookingModel.findByIdAndUpdate(
         bookingId,
         { status: "cancelled" },
+        { paymentStatus: "refunded" },
         { new: true }
       );
 
@@ -634,6 +710,98 @@ function bookingService(bookingModel) {
     }
   }
 
+  // Função para reembolsar um ou mais bilhetes individuais de um booking
+  async function refundTickets(bookingId, ticketIds) {
+    try {
+      const [booking, ticketsToRefund] = await Promise.all([
+        bookingModel.findById(bookingId),
+        ticketModel.find({
+          _id: { $in: ticketIds },
+          booking: bookingId,
+          status: { $nin: ["refunded", "cancelled", "used"] },
+        })
+      ]);
+
+      if (!booking) throw new Error("Booking not found");
+      if (booking.paymentStatus !== "paid") {
+        throw new Error("Booking not eligible for partial refunds");
+      }
+
+      if (ticketsToRefund.length === 0) {
+        throw new Error("No tickets found for refund or already refunded");
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(booking.paymentIntentId)
+
+      // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
+      const chargeId = paymentIntent.latest_charge;
+      const charge = await stripe.charges.retrieve(chargeId);
+      console.log("Charge:", charge);
+      const balanceTransactionId = charge.balance_transaction;
+      const balanceTransaction = await stripe.balanceTransactions.retrieve(
+        balanceTransactionId
+      );
+
+      // Obter o valor líquido da transação para calcular o reembolso
+      const netAmount = balanceTransaction.net;
+
+      // Calcular o valor total do reembolso para os bilhetes elegíveis
+      const refundAmount =
+        (netAmount / booking.seats.length) *
+        ticketsToRefund.length;
+
+      // Processar o reembolso total via Stripe
+      await refundPayment(booking.paymentIntentId, refundAmount);
+
+      // Atualizar o status dos bilhetes de forma otimizada com um único comando
+      const ticketUpdates = ticketsToRefund.map((ticket) => ({
+        updateOne: {
+          filter: { _id: ticket._id },
+          update: { status: "refunded", refundedAt: new Date() },
+        },
+      }));
+
+      // Experimentação com bulkWrite, usado para atualizar vários documentos de uma só vez
+      await ticketModel.bulkWrite(ticketUpdates);
+
+      // Libertar os assentos reservados na sessão
+      const seatNumbers = ticketsToRefund.map((ticket) => ticket.seat);
+      console.log(seatNumbers);
+      booking.session.seats = booking.session.seats.map((row) =>
+        row.map((seat) => {
+          if (seatNumbers.includes(seat.seat)) {
+            return { ...seat, status: "available" };
+          }
+          return seat;
+        })
+      );
+
+      await booking.session.save(); // Salvar a sessão com os assentos atualizados
+
+      // Verificar se todos os bilhetes do booking estão reembolsados
+      const allTicketsRefunded = await ticketModel.countDocuments({
+        booking: bookingId,
+        status: { $ne: "refunded" }
+      }) === 0;
+
+      // Se sim, atualizar o status do booking para "cancelado" e "refunded".
+      if (allTicketsRefunded) {
+        booking.status = "cancelled";
+        booking.paymentStatus = "refunded";
+        await booking.save();
+      }
+
+      console.log(`Tickets refunded successfully: ${ticketIds}`);
+      return {
+        message: "Tickets refunded successfully",
+        refundedTickets: ticketIds,
+      };
+    } catch (error) {
+      console.error("Error refunding tickets:", error);
+      throw new Error("Failed to refund tickets");
+    }
+  }
+
   // Função para reembolsar um pagamento por stripe
   async function refundPayment(paymentIntentId, amount = null) {
     try {
@@ -641,6 +809,15 @@ function bookingService(bookingModel) {
         payment_intent: paymentIntentId, // ID do PaymentIntent
         amount: amount, // Valor a ser reembolsado (em centavos)
       });
+
+      /*const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const booking = await bookingModel.findById(paymentIntent.metadata.bookingId).populate("user");
+      await userModel.findByIdAndUpdate(booking.user._id, {
+        $inc: { points: -paymentIntent.amount }, // Decrementar pontos do utilizador
+
+      }) */
+
+
       console.log("Reembolso criado:", refund);
       return refund;
     } catch (error) {

@@ -38,6 +38,19 @@ function sessionService(sessionModel) {
         throw new Error("Movie not found");
       }
 
+      // Verificar se já existe uma sessão com o mesmo filme, sala e data
+      const existingSession = await Session.findOne({
+        room: roomId,
+        movie: movieId,
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+      });
+
+      if (existingSession) {
+        throw new Error("Session already exists for the same movie, room, and time");
+      }
+
       // Acessar o layout de assentos da Room e mapear para a Session
       // Para cada objeto "row", mapear cada objeto "seat" e retornar
       // um objeto com o número do assento e o estado inicial

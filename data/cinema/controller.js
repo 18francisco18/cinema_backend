@@ -1,5 +1,6 @@
 const cinemaService = require('../cinema');
 
+
 const cinemaController = {
     createCinema,
     findAllCinemas,
@@ -15,50 +16,41 @@ const cinemaController = {
 }
 
 // Controlador para criar um novo cinema.
-async function createCinema(req, res) {
+async function createCinema(req, res, next) {
     try {
         const cinema = req.body;
         const newCinema = await cinemaService.create(cinema);
         res.status(201).send(newCinema);
     } catch (error) {
-        console.log(error);
-        if (error.message === "Check for missing fields or wrong fields") {
-            res.status(400).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error);
     }
 }
 
 // Controlador para buscar todos os cinemas.
-async function findAllCinemas(req, res) {
+async function findAllCinemas(req, res, next) {
     try {
-        const cinemas = await cinemaService.findAll();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const cinemas = await cinemaService.findAll(page, limit);
         res.status(200).send(cinemas);
     } catch (error) {
-        console.log(error);
-        res.status(500).send(error);
+        next(error)
     }
 }
 
 // Controlador para buscar um cinema pelo seu id.
-async function findCinemaById(req, res) {
+async function findCinemaById(req, res, next) {
     try {
         const { id } = req.params;
         const cinema = await cinemaService.findById(id);
         res.status(200).send(cinema);
     } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
 // Controlador para atualizar um cinema pelo seu id.
-async function updateCinemaById(req, res) {
+async function updateCinemaById(req, res, next) {
     try {
         const { id } = req.params;
         const cinema = req.body;
@@ -66,151 +58,64 @@ async function updateCinemaById(req, res) {
         res.status(200).send(updatedCinema);
     } catch (error) {
         console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
 // Controlador para buscar as salas de um cinema pelo seu id.
-async function findCinemaRoomsById (req, res) {
+async function findCinemaRoomsById (req, res, next) {
     try {
         const { id } = req.params;
-        const room = await cinemaService.findRoomsById(id);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const room = await cinemaService.findRoomsById(id, page, limit);
         res.status(200).send(room);
     } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-          res.status(404).json({ error: error.message });
-        } else {
-          res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
 // Retira uma sala de um cinema, não elimina.
-async function removeCinemaRoomById(req, res) {
+async function removeCinemaRoomById(req, res, next) {
     try {
         const { id, roomId } = req.params;
-        const cinema = await cinemaService.removeRoom(id, roomId);
-         if (!cinema) {
-           res.status(404).json({ error: "Cinema not found" });
-         } else {
-           res.status(200).json(cinema);
-           console.log("Room removed from cinema");
-         }
+        await cinemaService.removeRoom(id, roomId);
+        res.status(200).json({ message: "Room removed from cinema. Remaining rooms:", cinema: cinema.rooms });
     } catch (error) {
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
 // Controlador para remover um cinema e as respetivas salas associadas pelo seu id.
-async function removeCinemaById(req, res) {
+async function removeCinemaById(req, res, next) {
     try {
         const { id } = req.params;
-        const cinema = await cinemaService.removeCinemaById(id);
-
-        if (!cinema) {
-            res.status(404).json({ error: "Cinema not found" });
-        } else {
-            res.status(204).json({ message: "Cinema and associated rooms deleted." });
-            console.log("Cinema removed");
-        }
-
+        await cinemaService.removeCinemaById(id);
+        res.status(204).json({ message: "Cinema and associated rooms deleted." });
     } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
-// Controlador que remove um filme de um cinema
-async function removeMovieFromCinema(req, res){
-    try{
-        const { id, movieId } = req.params;
-        const cinema = await cinemaService.removeMovie(id, movieId);
-        if (!cinema) {
-            res.status(404).json({ error: "Cinema not found" });
-        } else {
-            res.status(200).json(cinema);
-            console.log("Movie removed from cinema");
-        }
-    }
-    catch(error){
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
-    }
-}
 
-// Adicionar filmes a um cartaz de um cinema
-async function addMoviesToBillboard(req, res) {
+async function addMoviesToBillboard(req, res, next) {
     try {
         const { id } = req.params;
         const { movies } = req.body;
-
-        console.log("Cinema ID:", id);
-        console.log("Movies to add:", movies);
-        
         const cinema = await cinemaService.addMovieToBillboard(id, movies);
-        if (!cinema) {
-            res.status(404).json({ error: "Cinema not found" });
-        } else {
-            res.status(200).json(cinema);
-            console.log("Movies added to billboard");
-        }   
+        res.status(200).send(cinema);
     } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error);
     }
 }
 
-// Adicionar filmes a todos os cartazes de cinema
-async function addMoviesToBillboards(req, res) {
-    try {
-      const { movies } = req.body;
-      console.log("Movies to add:", movies);
-      const result = await cinemaService.addMovieToAllBillboards(movies);
-      res.status(200).json({ message: result });
-    } catch (error) {
-      console.log(error);
-      if (error.message === "Cinema not found") {
-        res.status(404).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Internal Server Error" });
-      }
-    }
-  }
-
-// Pegar todos os filmes de um cinema
-async function getAllCinemaMovies(req, res) {
+async function getAllCinemaMovies(req, res, next) {
     try {
         const { id } = req.params;
         const movies = await cinemaService.getAllCinemaMovies(id);
         res.status(200).send(movies);
     } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next(error)
     }
 }
 
