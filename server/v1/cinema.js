@@ -19,10 +19,12 @@ function CinemaRouter() {
   );
   router.delete("/remove/:id", cinemaController.removeCinemaById);
   router.get("/:id/allMovies", cinemaController.getAllCinemaMovies);
+  router.delete("/:id/removeMovie/:movieId", cinemaController.removeMovieFromCinema);
   router.post(
     "/:id/addMoviesToBillboard",
     cinemaController.addMoviesToBillboard
   );
+  router.post("/addMoviesToAllBillboards", cinemaController.addMoviesToBillboards);
 
   return router;
 }

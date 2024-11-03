@@ -1,7 +1,5 @@
 const cinemaService = require('../cinema');
 
-
-
 const cinemaController = {
     createCinema,
     findAllCinemas,
@@ -10,12 +8,11 @@ const cinemaController = {
     findCinemaRoomsById,
     removeCinemaRoomById,
     removeCinemaById,
-    addMovieToRoom,
-    removeMovieFromRoom,
+    removeMovieFromCinema,
     addMoviesToBillboard,
+    addMoviesToBillboards,
     getAllCinemaMovies,
 }
-
 
 // Controlador para criar um novo cinema.
 async function createCinema(req, res) {
@@ -136,17 +133,19 @@ async function removeCinemaById(req, res) {
     }
 }
 
-async function addMovieToRoom(req, res) {
-    try {
-        const { id, room, movie } = req.params;
-        const cinema = await cinemaService.addMovieToRoom(id, room, movie);
+// Controlador que remove um filme de um cinema
+async function removeMovieFromCinema(req, res){
+    try{
+        const { id, movieId } = req.params;
+        const cinema = await cinemaService.removeMovie(id, movieId);
         if (!cinema) {
             res.status(404).json({ error: "Cinema not found" });
         } else {
             res.status(200).json(cinema);
-            console.log("Movie added to room");
+            console.log("Movie removed from cinema");
         }
-    } catch (error) {
+    }
+    catch(error){
         console.log(error);
         if (error.message === "Cinema not found") {
             res.status(404).json({ error: error.message });
@@ -156,26 +155,7 @@ async function addMovieToRoom(req, res) {
     }
 }
 
-async function removeMovieFromRoom(req, res) {
-    try {
-        const { id, room, movie } = req.params;
-        const cinema = await cinemaService.removeMovieFromRoom(id, room, movie);
-        if (!cinema) {
-            res.status(404).json({ error: "Cinema not found" });
-        } else {
-            res.status(200).json(cinema);
-            console.log("Movie removed from room");
-        }
-    } catch (error) {
-        console.log(error);
-        if (error.message === "Cinema not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
-    }
-}
-
+// Adicionar filmes a um cartaz de um cinema
 async function addMoviesToBillboard(req, res) {
     try {
         const { id } = req.params;
@@ -201,6 +181,24 @@ async function addMoviesToBillboard(req, res) {
     }
 }
 
+// Adicionar filmes a todos os cartazes de cinema
+async function addMoviesToBillboards(req, res) {
+    try {
+      const { movies } = req.body;
+      console.log("Movies to add:", movies);
+      const result = await cinemaService.addMovieToAllBillboards(movies);
+      res.status(200).json({ message: result });
+    } catch (error) {
+      console.log(error);
+      if (error.message === "Cinema not found") {
+        res.status(404).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    }
+  }
+
+// Pegar todos os filmes de um cinema
 async function getAllCinemaMovies(req, res) {
     try {
         const { id } = req.params;
