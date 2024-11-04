@@ -2,6 +2,7 @@ const productsService = require('../products')
 
 const productsController = {
     createProduct,
+    updateProduct,
     findAllProducts,
     findProductById,
     removeProductById,
@@ -10,10 +11,20 @@ const productsController = {
 
 async function createProduct(req, res, next) {
     try {
-        const product = await productsService.create(req.body);
+        const product = await productsService.createProduct(req.body);
         res.status(201).json(product);
     } catch (error) {
         console.log(error);
+        next(error)
+    }
+}
+
+async function updateProduct(req, res, next) {
+    try {
+        const { id } = req.params;
+        const product = await productsService.updateProduct(id, req.body);
+        res.status(200).json(product);
+    } catch (error) {
         next(error)
     }
 }
