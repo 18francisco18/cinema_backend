@@ -14,6 +14,7 @@ const cinemaController = {
     removeMovieFromCinema,
     removeMovieFromBillboards,
     getAllCinemaMovies,
+    getAllCinemaBillboards,
 }
 
 // Controlador para criar um novo cinema.
@@ -152,5 +153,17 @@ async function getAllCinemaMovies(req, res, next) {
         next(error)
     }
 }
+
+async function getAllCinemaBillboards(req, res, next) {
+    try {
+        const { id } = req.params;
+        const billboards = await cinemaService.getAllCinemaBillboards();
+        res.status(200).send(billboards);
+    } catch (error) {
+        next(error)
+    }
+}
+
+
 
 module.exports = cinemaController;

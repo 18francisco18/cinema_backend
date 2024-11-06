@@ -10,6 +10,7 @@ function ProductsRouter() {
 
     router.post("/create", productsController.createProduct);
     router.post("/createCategory", productsController.createCategory);
+    router.put("/update/:id", productsController.updateProduct);
     router.get("/all", productsController.findAllProducts);
     router.get("/find/:id", productsController.findProductById);
     router.delete("/remove/:id", productsController.removeProductById);

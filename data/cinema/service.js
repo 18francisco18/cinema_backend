@@ -24,6 +24,7 @@ function cinemaService(cinemaModel) {
     removeMovie,
     removeMovies,
     getAllCinemaMovies,
+    getAllCinemaBillboards,
   };
 
   // Cria um novo cinema
@@ -419,6 +420,31 @@ function cinemaService(cinemaModel) {
       }
 
       return cinema.movies;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  async function getAllCinemaBillboards() {
+    try {
+      const cinemas = await cinemaModel.find().populate("movies");
+      if (!cinemas || cinemas.length === 0) {
+        throw new NotFoundError("No cinemas found");
+      }
+
+      let allMovies = [];
+      cinemas.forEach(cinema => {
+        if (cinema.movies && cinema.movies.length > 0) {
+          allMovies = allMovies.concat(cinema.movies);
+        }
+      });
+
+      if (allMovies.length === 0) {
+        throw new NotFoundError("No movies found in any cinema");
+      }
+
+      return allMovies;
     } catch (err) {
       console.log(err);
       throw err;

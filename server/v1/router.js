@@ -10,6 +10,7 @@ let SessionsAPI = require("./sessions");
 let TicketsAPI = require("./tickets");
 let ProductsAPI = require("./products");
 let CategoriesAPI = require("./categories");
+let DiscountsAPI = require("./discounts");
 
 function init() {
   let api = express();
@@ -25,6 +26,7 @@ function init() {
   api.use("/tickets", TicketsAPI());
   api.use("/products", ProductsAPI());
   api.use("/products/categories", CategoriesAPI());
+  api.use("/discounts", DiscountsAPI());
 
   return api;
 }
