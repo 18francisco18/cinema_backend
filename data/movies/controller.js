@@ -9,7 +9,7 @@ const movieController = {
 };
 
 // Controlador para lidar com a busca de filmes
-async function searchMovie(req, res) {
+async function searchMovie(req, res, next) {
   const { title, year, plot } = req.body; // Extrai o título e o ano da requisição
 
   // Verifica se o título do filme foi fornecido
@@ -38,42 +38,42 @@ async function searchMovie(req, res) {
 
     res.status(201).send(newMovie); // Retorna o filme recém-salvo
   } catch (error) {
-    res.status(400).send({ error: error.message }); // Em caso de erro, retorna a mensagem
     console.log(error);
+    next(error);
   }
 }
 
 // Controlador para obter um filme pelo ID
-async function getMovieById(req, res) {
+async function getMovieById(req, res, next) {
   try {
     const { id } = req.params;
     const movie = await movieService.findById(id);
     res.status(200).send(movie);
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    next(error);
   }
 }
 
 // Controlador para obter todos os filmes
-async function getAllMovies(req, res) {
+async function getAllMovies(req, res, next) {
   try {
     const movies = await movieService.findAll();
     res.status(200).send(movies);
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    next(error);
   }
 }
 
-async function removeMovie(req, res) {
+async function removeMovie(req, res, next) {
   try {
     const { id } = req.params;
     const movie = await movieService.removeById(id);
     res.status(200).send(movie);
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    next(error);
   }
 }
 

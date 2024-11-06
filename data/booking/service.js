@@ -36,6 +36,7 @@ function bookingService(bookingModel) {
     refundPayment,
     refundTickets,
     findAllBookingsForSession,
+
   };
 
   async function create(booking, sessionId) {

@@ -22,8 +22,9 @@ function cinemaService(cinemaModel) {
     addMovieToBillboard,
     addMoviesToBillboards,
     removeMovie,
-    //removeMovies,
+    removeMovies,
     getAllCinemaMovies,
+    getAllCinemaBillboards,
   };
 
   // Cria um novo cinema
@@ -379,50 +380,32 @@ function cinemaService(cinemaModel) {
   }
 
   // Remover filmes de todos os cinemas
-  /*async function removeMovies(movies) {
+  async function removeMovies(movies) {
     try {
-      // Array para armazenar os filmes a serem removidos
-      const moviesToRemove = [];
-  
       // Para cada filme a ser removido
       for (let i = 0; i < movies.length; i++) {
-        const movie = movies[i];
-        console.log("Movie object:", movie); // Adicione este log para verificar a estrutura do objeto de filme
-  
-        const id = movie.id;
-        console.log("Movie ID:", id); // Adicione este log para verificar o valor do campo `_id`
-  
-        // Busca os detalhes do filme pelo ID
-        const movieDetails = await movieService.findById(id);
-  
-        if (!movieDetails) {
-          throw new Error("Movie not found");
+        // Encontra o filme pelo id
+        const movie = await Movie.findById(movies[i]);
+        if (!movie) {
+          throw new NotFoundError("Movie not found");
         }
-  
-        // Verifica se o filme já existe no banco de dados
-        let movieInDb = await Movie.findOne({ imdbID: movieDetails.imdbID });
-  
-        if (!movieInDb) {
-          throw new Error(`Movie with ID ${movieDetails.imdbID} not found`);
+
+        // Remove o filme de todos os cartazes de todos os cinemas
+        const cinemas = await cinemaModel.find();
+        for (let j = 0; j < cinemas.length; j++) {
+          if (cinemas[j].movies.includes(movies[i])) {
+            cinemas[j].movies.pull(movies[i]);
+            await cinemas[j].save();
+          }
         }
-  
-        // Adiciona o filme ao array de filmes a serem removidos
-        moviesToRemove.push(movieInDb._id);
       }
-  
-      // Remove os filmes de todos os cinemas
-      const cinemas = await cinemaModel.find();
-      for (let i = 0; i < cinemas.length; i++) {
-        cinemas[i].movies.pull(...moviesToRemove);
-        await cinemas[i].save();
-      }
-  
-      return moviesToRemove;
+
+      return movies;
     } catch (err) {
       console.log(err);
       throw err;
     }
-  }*/
+  }
 
   // Busca todos os filmes de um cinema
   async function getAllCinemaMovies(id) {
@@ -437,6 +420,31 @@ function cinemaService(cinemaModel) {
       }
 
       return cinema.movies;
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  async function getAllCinemaBillboards() {
+    try {
+      const cinemas = await cinemaModel.find().populate("movies");
+      if (!cinemas || cinemas.length === 0) {
+        throw new NotFoundError("No cinemas found");
+      }
+
+      let allMovies = [];
+      cinemas.forEach(cinema => {
+        if (cinema.movies && cinema.movies.length > 0) {
+          allMovies = allMovies.concat(cinema.movies);
+        }
+      });
+
+      if (allMovies.length === 0) {
+        throw new NotFoundError("No movies found in any cinema");
+      }
+
+      return allMovies;
     } catch (err) {
       console.log(err);
       throw err;

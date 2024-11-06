@@ -12,8 +12,9 @@ const cinemaController = {
     addMoviesToBillboard,
     addMoviesToBillboards,
     removeMovieFromCinema,
-    //removeMovieFromBillboards,
+    removeMovieFromBillboards,
     getAllCinemaMovies,
+    getAllCinemaBillboards,
 }
 
 // Controlador para criar um novo cinema.
@@ -133,16 +134,15 @@ async function removeMovieFromCinema(req, res, next) {
 }
 
 // Controlador para remover filmes de todos os cartazes de todos os cinemas.
-/*async function removeMovieFromBillboards(req, res, next) {
+async function removeMovieFromBillboards(req, res, next) {
     try {
         const { movies } = req.body;
         const cinemas = await cinemaService.removeMovies(movies);
         res.status(200).send(cinemas);
-    }
-    catch (error) {
+    } catch (error) {
         next(error)
     }
-}*/
+}
 
 async function getAllCinemaMovies(req, res, next) {
     try {
@@ -153,5 +153,17 @@ async function getAllCinemaMovies(req, res, next) {
         next(error)
     }
 }
+
+async function getAllCinemaBillboards(req, res, next) {
+    try {
+        const { id } = req.params;
+        const billboards = await cinemaService.getAllCinemaBillboards();
+        res.status(200).send(billboards);
+    } catch (error) {
+        next(error)
+    }
+}
+
+
 
 module.exports = cinemaController;
