@@ -1,0 +1,1 @@
+//fazer maneira de gastar pontos
