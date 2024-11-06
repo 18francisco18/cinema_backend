@@ -1,6 +1,7 @@
 const axios = require("axios");
 const mongoose = require("mongoose");
 const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
+const { ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, DatabaseError, ServiceUnavailableError } = require('../../AppError');
 
 function MovieService(movieModel) {
   let service = {
@@ -18,7 +19,7 @@ function MovieService(movieModel) {
       return savedMovie;
     } catch (error) {
       console.log(error);
-      throw new Error(`Erro ao criar o filme: ${error.message}`);
+      throw(error);
     }
   }
 
@@ -92,7 +93,7 @@ function MovieService(movieModel) {
       return completeMovieData;
     } catch (error) {
       console.log(error)
-      throw new Error(`Erro ao buscar o filme: ${error.message}`);
+      throw(error);
     }
   }
 
@@ -101,11 +102,11 @@ function MovieService(movieModel) {
     try {
       const movie = await movieModel.findById(id);
       if (!movie) {
-        throw new Error("Filme não encontrado");
+        throw new NotFoundError("Filme não encontrado");
       }
       return movie;
     } catch (err) {
-      throw new Error("Erro ao buscar o filme");
+        throw(error);
     }
   }
 
@@ -123,7 +124,8 @@ function MovieService(movieModel) {
         totalMovies,
       };
     } catch (err) {
-      throw new Error("Erro ao buscar os filmes");
+        console.log(err);
+        throw(error);
     }
   }
 
@@ -137,7 +139,7 @@ function MovieService(movieModel) {
       return movie;
     } catch (err) {
       console.log(err);
-      throw new Error("Erro ao remover o filme");
+      throw(error);
     }
   }
 

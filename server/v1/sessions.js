@@ -18,6 +18,7 @@ function SessionsRouter() {
     "/:id/applyUnavailability",
     sessionsController.applyUnavaliabilityToSeats
   );
+    router.get("/:id/report", sessionsController.getSessionsReport);
 
   return router;
 }

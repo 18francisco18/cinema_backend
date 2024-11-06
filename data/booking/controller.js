@@ -136,6 +136,17 @@ async function refundTicketsFromBooking(req, res) {
   }
 }
 
+async function findRefunds(req, res) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const result = await bookingService.findRefunds(page, limit);
+    res.status(200).send(result);
+  } catch (error) {
+    res.status(500).send({ error: "Error fetching refunds" });
+  }
+}
+
 
 
 

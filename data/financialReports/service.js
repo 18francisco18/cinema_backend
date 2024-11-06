@@ -2,13 +2,14 @@ const internalPaymentReport = require('./internalPaymentReport');
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
+const { ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, DatabaseError, ServiceUnavailableError } = require('../../AppError');
 
 function financialReportsService(financialReportsModel) {
     let service = {
         createInternalPaymentReport,
         save,
-        findAllInternalPaymentReports,
-        findInternalPaymentReportById,
+        /*findAllInternalPaymentReports,
+        findInternalPaymentReportById,*/
     };
 
     // Criar PDF de um relatório de venda interno.

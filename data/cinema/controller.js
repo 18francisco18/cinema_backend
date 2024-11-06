@@ -12,7 +12,7 @@ const cinemaController = {
     addMoviesToBillboard,
     addMoviesToBillboards,
     removeMovieFromCinema,
-    //removeMovieFromBillboards,
+    removeMovieFromBillboards,
     getAllCinemaMovies,
 }
 
@@ -133,16 +133,15 @@ async function removeMovieFromCinema(req, res, next) {
 }
 
 // Controlador para remover filmes de todos os cartazes de todos os cinemas.
-/*async function removeMovieFromBillboards(req, res, next) {
+async function removeMovieFromBillboards(req, res, next) {
     try {
         const { movies } = req.body;
         const cinemas = await cinemaService.removeMovies(movies);
         res.status(200).send(cinemas);
-    }
-    catch (error) {
+    } catch (error) {
         next(error)
     }
-}*/
+}
 
 async function getAllCinemaMovies(req, res, next) {
     try {

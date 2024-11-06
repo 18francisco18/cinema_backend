@@ -1,4 +1,4 @@
-const AppError = require('../../AppError');
+const AppError = require('../../../AppError');
 const { ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, DatabaseError, ServiceUnavailableError } = require('../../../AppError');
 
 
