@@ -12,7 +12,7 @@ function MoviesRouter() {
 
   router.get("/", movieController.getAllMovies);
 
-  router.get("/:id", movieController.getMovieById);
+  router.get("/findById/:id", movieController.getMovieById);
 
   router.delete("/remove/:id", movieController.removeMovie);
 
