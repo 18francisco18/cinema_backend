@@ -8,8 +8,10 @@ function DiscountsRouter() {
     router.use(bodyParser.json({ limit: "100mb" }));
     router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-    router.post("/create", discountController.createDiscountForProduct);
+    router.post("/createPromoCode", discountController.createDiscountForProduct);
+    router.post("/apply-discount/:productId", discountController.applyDiscountToProduct);
     router.get("/all", discountController.getAllStripeDiscounts);
+
 
     return router;
 }

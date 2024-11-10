@@ -7,6 +7,8 @@ const productSchema = new Schema({
     price: { type: Number, required: true },
     stripeProductId: { type: String, required: true },
     stripePriceId: { type: String, required: true },
+    discountedPrice: { type: Number, required: false },
+    discountExpiration: { type: Date, required: false },
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
     image: { type: String, required: true },
     stock: { type: Boolean, required: true }

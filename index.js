@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const cron = require("node-cron");
 const CORS = require("cors");
 const sessionService = require("./data/sessions");
+const discountService = require("./data/discounts");
 const apiVersion = process.env.API_VERSION || 'v1';
 const errorHandler = require(`./middleware/errorHandler`);
 
@@ -38,6 +39,11 @@ cron.schedule('*/5 * * * *', () => {
 cron.schedule('*/5 * * * *', () => {
   console.log('Verificando por sessões expiradas...');
   sessionService.deleteSessions();
+});
+
+cron.schedule('0 * * * *', () => {
+  console.log('Verificando por descontos fora da validade...');
+  discountService.checkForExpiredDiscounts();
 });
 
 app.use(errorHandler)
