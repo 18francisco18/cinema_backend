@@ -9,9 +9,8 @@ const sessionStatus = require("../sessions/sessionStatus");
 const nodeMailer = require("nodemailer");
 const dotenv = require("dotenv");
 const Session = require("../sessions/sessions");
+const Product = require("../products/product");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-
-
 
 dotenv.config();
 
@@ -36,7 +35,6 @@ function bookingService(bookingModel) {
     refundPayment,
     refundTickets,
     findAllBookingsForSession,
-
   };
 
   async function create(booking, sessionId) {
@@ -338,6 +336,70 @@ function bookingService(bookingModel) {
         throw new Error("User not found");
       }
 
+      const products = await Product.find({
+        _id: { $in: booking.products.map((p) => p._id) },
+      });
+      const line_items = [];
+
+      // Adicionar cada produto do booking ao line_items
+      products.forEach((product) => {
+        const matchingProducts = booking.products.filter((p) =>
+          p._id.equals(product._id)
+        );
+        const quantity = matchingProducts.length;
+
+
+        if (quantity > 0) {
+          console.log(matchingProducts);
+          console.log(product.discountedPrice);
+
+          console.log(`Product ID: ${product._id}`);
+          console.log(`Discounted Price: ${product.discountedPrice}`);
+          console.log(`Discount Expiration: ${product.discountExpiration}`);
+          console.log(`Current Date: ${new Date()}`);
+
+          const isDiscountValid =
+            product.discountedPrice && product.discountExpiration > new Date();
+          const priceToCharge = isDiscountValid
+            ? product.discountedPrice
+            : product.price;
+          console.log(`Is Discount Valid: ${isDiscountValid}`);
+          console.log(`Price to charge: ${priceToCharge}`); // Adicione um log para verificar o preço
+
+          // Adicionar o produto ao line_items com a quantidade correta
+          line_items.push({
+            price_data: {
+              currency: "eur",
+              product_data: {
+                name: product.name,
+                description: product.description,
+                images: [product.image],
+              },
+              unit_amount: priceToCharge * 100, // O Stripe lida com valores em centavos
+            },
+            quantity: quantity, // Quantidade correta
+          });
+        }
+      });
+
+      // Adicionar o ingresso ao line_items
+      line_items.push({
+        price_data: {
+          currency: "eur",
+          product_data: {
+            name: `Movie Ticket for ${session.movie.title}`,
+            description: `
+                        Seats: ${booking.seats.join(", ")}
+                        Room: ${session.room.name}
+                        Cinema: ${session.room.cinema.name}
+                    `,
+            images: [session.movie.poster],
+          },
+          unit_amount: session.price * 100,
+        },
+        quantity: booking.seats.length,
+      });
+
       // Criar a sessão de pagamento no Stripe
       const paymentSession = await stripe.checkout.sessions.create({
         payment_method_types: [
@@ -355,24 +417,7 @@ function bookingService(bookingModel) {
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
-        line_items: [
-          {
-            price_data: {
-              currency: "eur",
-              product_data: {
-                name: `Movie Ticket for ${session.movie.title}`,
-                description: `
-                Seats: ${booking.seats.join(", ")}
-                Room: ${session.room.name}
-                Cinema: ${session.room.cinema.name}
-              `,
-                images: [session.movie.poster], // URL da imagem do pôster do filme
-              },
-              unit_amount: session.price * 100, // Preço unitário por ingresso em centavos
-            },
-            quantity: booking.seats.length, // Quantidade de assentos reservados
-          },
-        ],
+        line_items: line_items,
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
 
@@ -431,6 +476,7 @@ function bookingService(bookingModel) {
                     populate: { path: "cinema", select: "name" },
                   },
                 ],
+                path: "products",
               },
             ],
           });
@@ -445,6 +491,7 @@ function bookingService(bookingModel) {
           room: populatedBooking.session.room.name, // Nome da sala
           cinema: populatedBooking.session.room.cinema.name, // Nome do cinema
           seat: populatedTicket.seat, // Assento do bilhete
+          products: [populatedBooking.products], // Produtos adicionais
           startTime: populatedBooking.session.startTime, // Hora de início da sessão
           totalAmount: populatedBooking.session.price, // Valor de cada bilhete
           printedTime: populatedTicket.issuedAt, // Hora de emissão do bilhete
@@ -543,7 +590,10 @@ function bookingService(bookingModel) {
 
       const skip = (page - 1) * limit;
       const total = await bookingModel.countDocuments();
-      const booking = await bookingModel.find({ session: sessionId }).skip(skip).limit(limit);
+      const booking = await bookingModel
+        .find({ session: sessionId })
+        .skip(skip)
+        .limit(limit);
       if (!booking) {
         throw new Error("Booking not found");
       }
@@ -720,7 +770,7 @@ function bookingService(bookingModel) {
           _id: { $in: ticketIds },
           booking: bookingId,
           status: { $nin: ["refunded", "cancelled", "used"] },
-        })
+        }),
       ]);
 
       if (!booking) throw new Error("Booking not found");
@@ -732,7 +782,9 @@ function bookingService(bookingModel) {
         throw new Error("No tickets found for refund or already refunded");
       }
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(booking.paymentIntentId)
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        booking.paymentIntentId
+      );
 
       // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
       const chargeId = paymentIntent.latest_charge;
@@ -748,8 +800,7 @@ function bookingService(bookingModel) {
 
       // Calcular o valor total do reembolso para os bilhetes elegíveis
       const refundAmount =
-        (netAmount / booking.seats.length) *
-        ticketsToRefund.length;
+        (netAmount / booking.seats.length) * ticketsToRefund.length;
 
       // Processar o reembolso total via Stripe
       await refundPayment(booking.paymentIntentId, refundAmount);
@@ -780,10 +831,11 @@ function bookingService(bookingModel) {
       await booking.session.save(); // Salvar a sessão com os assentos atualizados
 
       // Verificar se todos os bilhetes do booking estão reembolsados
-      const allTicketsRefunded = await ticketModel.countDocuments({
-        booking: bookingId,
-        status: { $ne: "refunded" }
-      }) === 0;
+      const allTicketsRefunded =
+        (await ticketModel.countDocuments({
+          booking: bookingId,
+          status: { $ne: "refunded" },
+        })) === 0;
 
       // Se sim, atualizar o status do booking para "cancelado" e "refunded".
       if (allTicketsRefunded) {
@@ -817,7 +869,6 @@ function bookingService(bookingModel) {
         $inc: { points: -paymentIntent.amount }, // Decrementar pontos do utilizador
 
       }) */
-
 
       console.log("Reembolso criado:", refund);
       return refund;

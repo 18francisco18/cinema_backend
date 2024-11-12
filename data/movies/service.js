@@ -106,7 +106,8 @@ function MovieService(movieModel) {
       }
       return movie;
     } catch (err) {
-        throw(error);
+      console.log(err);
+      throw err;
     }
   }
 
