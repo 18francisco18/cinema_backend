@@ -11,6 +11,7 @@ let TicketsAPI = require("./tickets");
 let ProductsAPI = require("./products");
 let CategoriesAPI = require("./categories");
 let DiscountsAPI = require("./discounts");
+let PointsAPI = require("./points");
 
 function init() {
   let api = express();
@@ -27,6 +28,7 @@ function init() {
   api.use("/products", ProductsAPI());
   api.use("/products/categories", CategoriesAPI());
   api.use("/discounts", DiscountsAPI());
+  api.use("/points", PointsAPI());
 
   return api;
 }
