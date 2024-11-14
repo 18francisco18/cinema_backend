@@ -1,7 +1,15 @@
 const axios = require("axios");
 const mongoose = require("mongoose");
 const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
-const { ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, DatabaseError, ServiceUnavailableError } = require('../../AppError');
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
 
 function MovieService(movieModel) {
   let service = {
@@ -10,6 +18,7 @@ function MovieService(movieModel) {
     findById,
     findAll,
     removeById,
+    searchMovie,
   };
 
   async function create(movie) {
@@ -19,7 +28,7 @@ function MovieService(movieModel) {
       return savedMovie;
     } catch (error) {
       console.log(error);
-      throw(error);
+      throw error;
     }
   }
 
@@ -49,11 +58,11 @@ function MovieService(movieModel) {
       // Retorna os dados do filme
       const movieData = response.data;
 
-      // O objetivo deste código é transformar o array de avaliações (Ratings) retornado pela API OMDb para garantir que cada 
-      //objeto de avaliação tenha os campos source e value preenchidos, 
+      // O objetivo deste código é transformar o array de avaliações (Ratings) retornado pela API OMDb para garantir que cada
+      //objeto de avaliação tenha os campos source e value preenchidos,
       //mesmo que a API não os forneça.
       //Primeiro acede-se ao array de avaliações com movieData.Ratings (seguido de OU [] para caso seja null ou undefined).
-      //Depois, mapeia-se o array de avaliações, transformando cada objeto de avaliação (rating) 
+      //Depois, mapeia-se o array de avaliações, transformando cada objeto de avaliação (rating)
       //em um objeto com os campos source e value preenchidos.
       const transformedRatings = (movieData.Ratings || []).map((rating) => ({
         source: rating.Source || "N/A",
@@ -92,8 +101,8 @@ function MovieService(movieModel) {
       // Retorna os dados completos do filme
       return completeMovieData;
     } catch (error) {
-      console.log(error)
-      throw(error);
+      console.log(error);
+      throw error;
     }
   }
 
@@ -114,10 +123,11 @@ function MovieService(movieModel) {
   // Função para buscar todos os filmes no banco de dados
   async function findAll(page, limit) {
     try {
-      const movies = await movieModel.find()
+      const movies = await movieModel
+        .find()
         .skip((page - 1) * limit)
         .limit(limit);
-        const totalMovies = await movieModel.countDocuments();
+      const totalMovies = await movieModel.countDocuments();
       return {
         movies,
         totalPages: Math.ceil(totalMovies / limit),
@@ -125,8 +135,8 @@ function MovieService(movieModel) {
         totalMovies,
       };
     } catch (err) {
-        console.log(err);
-        throw(error);
+      console.log(err);
+      throw error;
     }
   }
 
@@ -140,11 +150,43 @@ function MovieService(movieModel) {
       return movie;
     } catch (err) {
       console.log(err);
-      throw(error);
+      throw error;
+    }
+  }
+
+  async function searchMovie(title, year, plot) {
+    // Verifica se o título do filme foi fornecido
+    if (!title) {
+      throw new ValidationError("Por favor, forneça o título do filme.");
+    }
+
+    try {
+      // Verifica se o filme já está no banco de dados
+      const existingMovie = await movieModel.findOne({ title: movie.title, year: movie.year });
+      if (existingMovie) {
+        console.log(
+          "Filme já existe no banco de dados, acedendo à base de dados..."
+        );
+        return existingMovie; // Se o filme já existe, retorna-o
+      }
+
+      // Chama o serviço que faz a requisição à OMDb API
+      const movie = await movieModel.getMovieByTitleYearAndPlot(
+        title,
+        year,
+        plot
+      );
+
+      // Se não existir, salva no banco de dados
+      const newMovie = await movieModel.create(movie);
+      return newMovie;
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   }
 
   return service;
 }
 
-module.exports = MovieService
+module.exports = MovieService;

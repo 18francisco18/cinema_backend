@@ -12,6 +12,7 @@ async function createInternalPaymentReport(internalPaymentReport) {
     await financialReport.createInternalPaymentReport(internalPaymentReport);
   } catch (error) {
     console.log(error);
+    next();
   }
 }
 

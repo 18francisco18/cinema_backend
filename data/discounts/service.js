@@ -1,5 +1,14 @@
 const dotenv = require('dotenv');
-const {NotFoundError} = require("../../AppError");
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+  PaymentRequiredError,
+} = require("../../AppError");
 dotenv.config();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Product = require('../products/product');
@@ -61,7 +70,7 @@ function discountsService(discountModel) {
     async function applyDiscountToProduct(productId, discountPercentage, expirationDate) {
         try {
             const product = await Product.findById(productId);
-            if (!product) throw new Error("Produto não encontrado");
+            if (!product) throw new NotFoundError("Produto não encontrado");
 
             // Calcular e aplicar o preço com desconto
             let discountedPrice = product.price * (1 - discountPercentage / 100);

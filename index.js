@@ -5,7 +5,7 @@ const cron = require("node-cron");
 const CORS = require("cors");
 const sessionService = require("./data/sessions");
 const discountService = require("./data/discounts");
-const apiVersion = process.env.API_VERSION || 'v1';
+const apiVersion = process.env.API_VERSION;
 const errorHandler = require(`./middleware/errorHandler`);
 
 const config = require("./config");
@@ -21,12 +21,13 @@ mongoose
 let router = require(`./server/${apiVersion}/router`);
 var app = express();
 app.use(CORS({
-  origin: 'http://localhost:4000',
+  origin: ['http://localhost:4000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  withCredentials: true,
 }));
 //app.use(express.json()); 
-app.use(router.init());
+app.use(router.init(`/api/${apiVersion}`));
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos
 // ATENÇÃO: A razão do uso do node-cron é explicada no arquivo service.js de sessions,
