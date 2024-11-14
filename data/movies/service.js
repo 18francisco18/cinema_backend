@@ -171,7 +171,7 @@ function MovieService(movieModel) {
       }
 
       // Chama o serviço que faz a requisição à OMDb API
-      const movie = await movieModel.getMovieByTitleYearAndPlot(
+      const movie = await getMovieByTitleYearAndPlot(
         title,
         year,
         plot
