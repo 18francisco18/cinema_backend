@@ -27,13 +27,13 @@ function RecoverPassword() {
       host: "sandbox.smtp.mailtrap.io",
       port: 2525,
       auth: {
-        user: "16273252cae631",
-        pass: "1b4171bcd26880",
+        user: "c2139a2676ae88",
+        pass: "0483249347945f",
       },
     });
 
     let mailOptions = {
-      from: "support.househub@gmail.com",
+      from: "support.cinemaclub@gmail.com",
       to: user.email,
       subject: "Password recovery",
       text: `You requested for a password recovery, here you have your token to change the password: ${token}`,
