@@ -1,5 +1,14 @@
 const ticketModel = require('./tickets');
 const booking = require('../booking');
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
 
 function TicketService(ticketModel) {
     let service = {
@@ -16,8 +25,7 @@ function TicketService(ticketModel) {
             let savedTicket = await newTicket.save();
             return savedTicket;
         } catch (error) {
-            console.log(error);
-            throw new Error(`Error creating ticket: ${error.message}`);
+            throw new DatabaseError(`Error creating ticket: ${error.message}`);
         }
         
     }
@@ -25,33 +33,38 @@ function TicketService(ticketModel) {
     async function findById(id) {
         try {
             let ticket = await ticketModel.findById(id);
+            if (!ticket) throw new NotFoundError("Ticket not found");
             return ticket;
         } catch (error) {
-            console.log(error);
-            throw new Error(`Error finding ticket: ${error.message}`);
+            throw error;
         }
     }
 
     async function findAll() {
         try {
             let tickets = await ticketModel.find();
+            if (!tickets) throw new DatabaseError("Tickets not found");
+            if (tickets.length === 0) throw new NotFoundError("No tickets found");
             return tickets;
         } catch (error) {
             console.log(error);
-            throw new Error(`Error finding tickets: ${error.message}`);
+            throw error;
         }
     }
 
     async function removeById(id) {
         try {
             let ticket = await ticketModel.findByIdAndDelete(id);
+            if (!ticket) throw new NotFoundError("Ticket not found");
             return ticket;
         } catch (error) {
             console.log(error);
-            throw new Error(`Error deleting ticket: ${error.message}`);
+            throw error;
         }
     }
 
+    // Função para verificar o QR Code (POR FAZER)
+    // ESTE CODIGO ESTÁ EXTREMAMENTE DESATUALIZADO!
     async function verifyQRCode(reservationId) {
         try {
             const ticket = await ticketModel.findById(reservationId);

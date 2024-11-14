@@ -1,5 +1,15 @@
 const CinemaModel = require('../cinema');
 const seatStatus = require('./seatStatus');
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
+
 
 function RoomService(roomModel) {
     let service = {
@@ -27,7 +37,7 @@ function RoomService(roomModel) {
             
         } catch (error) {
             console.log(error);
-            throw new Error(`Error creating room: ${error.message}`);
+            throw new DatabaseError(`Error creating room: ${error.message}`);
         }
     }
 
@@ -35,15 +45,10 @@ function RoomService(roomModel) {
     async function findById(id) {
         try {
             const room = await roomModel.findById(id);
-            if (!room) {
-                throw new Error("Room not found");
-            }
+            if (!room) throw new NotFoundError("Room not found");
             return room;
         } catch (err) {
-            if (err.message === "Room not found") {
-            throw err; // Re-lança o erro "Room not found"
-        }
-        throw new Error("Error fetching room");
+            throw err;
         }
     }
 
@@ -55,6 +60,10 @@ function RoomService(roomModel) {
             const rooms = await roomModel.find().skip(skip).limit(limit);
             const total = await roomModel.countDocuments();
 
+            if (rooms.length === 0) {
+                throw new NotFoundError("No rooms found");
+            }
+
             return {
                 rooms,
                 page,
@@ -62,7 +71,7 @@ function RoomService(roomModel) {
                 pages: Math.ceil(total / limit),
             };
         } catch (err) {
-            throw new Error("Error fetching rooms");
+            throw err;
         }
     }
 
@@ -70,17 +79,11 @@ function RoomService(roomModel) {
     async function removeById(id) {
         try {
             const room = await roomModel.findByIdAndDelete(id);
-            if (!room) {
-                throw new Error("Room not found");
-            }
+            if (!room) throw new NotFoundError("Room not found");
             return room;
         } catch (err) {
             console.log(err);
-
-            if (err.message === "Room not found") {
-                throw err;
-            }  
-            throw new Error("Error removing room");
+            throw err;
         }
     }
 
@@ -92,16 +95,11 @@ function RoomService(roomModel) {
             const updatedRoom = await roomModel.findByIdAndUpdate(id, room, {
                 new: true,
             });
-            if (!updatedRoom) {
-                throw new Error("Room not found");
-            }
+            if (!updatedRoom) throw new NotFoundError("Room not found");
             return updatedRoom;
         }
         catch (err) {
-            if (err.message === "Room not found") {
-              throw err;
-            }
-            throw new Error("Error updating room");
+            throw err;
         }
     }
 
@@ -109,13 +107,13 @@ function RoomService(roomModel) {
         try {
             const room = await roomModel.findById(id);
             if (!room) {
-                throw new Error("Room not found");
+                throw new NotFoundError("Room not found");
             }
     
             // Verifica se o status do assento é válido
             const validStatuses = [seatStatus.inCondition, seatStatus.inaccessible];
             if (!validStatuses.includes(seat.status)) {
-                throw new Error("Invalid seat status");
+                throw new ValidationError("Invalid seat status");
             }
     
             let seatFound = false;
@@ -131,22 +129,13 @@ function RoomService(roomModel) {
             });
     
             if (!seatFound) {
-                throw new Error("Invalid seat number");
+                throw new ValidationError("Invalid seat number");
             }
     
             await room.save();
         } catch (err) {
             console.log(err);
-            if (err.message === "Room not found") {
-                throw err;
-            }
-            if (err.message === "Invalid seat status") {
-                throw new Error("Invalid seat status, either change to 'inCondition' or 'inaccessible'");
-            }
-            if (err.message === "Invalid seat number") {
-                throw new Error("Invalid seat number");
-            }
-            throw new Error("Error updating room");
+            throw err;
         }
     }
 

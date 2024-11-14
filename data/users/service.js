@@ -1,6 +1,15 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
 
 function UserService(UserModel) {
   let service = {
@@ -29,13 +38,15 @@ function UserService(UserModel) {
 
       // Cria uma nova instância do modelo de usuário
       let newUser = new UserModel(newUserWithPassword);
+      if (!newUser) throw new DatabaseError("Error creating user");
+      
 
       // Tenta salvar o novo usuário no banco de dados
       const result = await save(newUser);
       return result;
     } catch (err) {
       console.error("Error in create function:", err); // Adicionando um log mais detalhado
-      return Promise.reject("Not Saved");
+      throw err;
     }
   }
 
@@ -46,7 +57,7 @@ function UserService(UserModel) {
     return "User created";
   } catch (err) {
     console.error("Error saving user:", err);  // Adicionando um log mais detalhado
-    return Promise.reject(`There is a problem with register: ${err.message}`);
+    throw new DatabaseError("Error saving user");
   }
 }
 
@@ -55,12 +66,10 @@ function UserService(UserModel) {
   async function findById(id) {
     try {
       const user = await UserModel.findById(id);
-      if (!user) {
-        return Promise.reject("User not found");
-      }
+      if (!user) throw new NotFoundError("User not found");
       return user;
     } catch (err) {
-      return Promise.reject("Error fetching user");
+      throw err;
     }
   }
 
@@ -68,9 +77,11 @@ function UserService(UserModel) {
   async function findAll() {
     try {
       const users = await UserModel.find({});
+      if (!users) throw new DatabaseError("Users not found");
+      if (users.length === 0) throw new NotFoundError("No users found");
       return users;
     } catch (err) {
-      return Promise.reject("Error fetching users");
+      throw err;
     }
   }
 
@@ -78,15 +89,10 @@ function UserService(UserModel) {
   async function findUser(model, body) {
     try {
       const user = await model.findOne({ email: body.email });
-      if (!user) {
-        throw new Error("User not found");
-      }
+      if (!user) throw new NotFoundError("User not found");
 
       const match = await bcrypt.compare(body.password, user.password);
-      if (!match) {
-        throw new Error("Invalid password");
-      }
-
+      if (!match) throw new NotFoundError("Invalid password");
       return user;
     } catch (err) {
       throw err;
@@ -98,11 +104,11 @@ function UserService(UserModel) {
     try {
       const user = await UserModel.findByIdAndDelete(id);
       if (!user) {
-        return Promise.reject("User not found");
+        throw new NotFoundError("User not found");
       }
       return "User successfully removed";
     } catch (err) {
-      return Promise.reject("Error removing user");
+      throw err;
     }
   }
 
@@ -112,12 +118,10 @@ function UserService(UserModel) {
       const user = await UserModel.findByIdAndUpdate(id, updateData, {
         new: true,
       });
-      if (!user) {
-        return Promise.reject("User not found");
-      }
+      if (!user) throw new NotFoundError("User not found");
       return user;
     } catch (err) {
-      return Promise.reject("Error updating user");
+      throw err;
     }
   }
 

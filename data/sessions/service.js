@@ -7,6 +7,15 @@ const sessionStatus = require("./sessionStatus");
 const sessionReport = require("./sessionReport");
 const booking = require("../booking/booking");
 const ticketModel = require("../tickets/tickets");
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
 
 function sessionService(sessionModel) {
   let service = {
@@ -18,7 +27,7 @@ function sessionService(sessionModel) {
     checkAndUpdateSessions,
     cancelSession,
     deleteSessions,
-    applyUnavaliabilityToSeats,
+    applyUnavailabilityToSeats,
     //generateSessionReport,
   };
 
@@ -31,14 +40,10 @@ function sessionService(sessionModel) {
     try {
       // Buscar o layout da Room pelo ID
       const room = await Room.findById(roomId);
-      if (!room) {
-        throw new Error("Room not found");
-      }
+      if (!room) throw new NotFoundError("Room not found");
 
       const movie = await Movie.findById(movieId);
-      if (!movie) {
-        throw new Error("Movie not found");
-      }
+      if (!movie) throw new NotFoundError("Movie not found");
 
       // Verificar se já existe uma sessão com o mesmo filme, sala e data
       const existingSession = await Session.findOne({
@@ -50,7 +55,9 @@ function sessionService(sessionModel) {
       });
 
       if (existingSession) {
-        throw new Error("Session already exists for the same movie, room, and time");
+        throw new ValidationError(
+          "Session already exists for the same movie, room, and time"
+        );
       }
 
       // Acessar o layout de assentos da Room e mapear para a Session
@@ -59,9 +66,10 @@ function sessionService(sessionModel) {
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
           seat: seat.number,
-          status: seat.status === seatStatus.inaccessible // Se o assento da sala for inacessível
-            ? seatStatus.inaccessible // Assentos inacessíveis da sala são refletidos na sessão
-            : seatStatus.available // Assentos disponíveis começam como 'available'
+          status:
+            seat.status === seatStatus.inaccessible // Se o assento da sala for inacessível
+              ? seatStatus.inaccessible // Assentos inacessíveis da sala são refletidos na sessão
+              : seatStatus.available, // Assentos disponíveis começam como 'available'
         }));
       });
 
@@ -81,26 +89,23 @@ function sessionService(sessionModel) {
       return session;
     } catch (error) {
       console.error(error);
-
-      if (error.message === "Room not found") {
-        throw new Error("Room not found");
-      }
-
-      if (error.message === "Movie not found") {
-        throw new Error("Movie not found");
-      }
-
-      throw new Error("Internal server error");
+      throw error;
     }
   }
 
+  // Função para buscar todas as sessões
+  // falta fazer paginação e sorting.
   async function findAll() {
     try {
       let sessions = await sessionModel.find();
+
+      if (!sessions) throw new DatabaseError("Error finding all sessions");
+      if (sessions.length === 0) throw new NotFoundError("No sessions found");
+
       return sessions;
     } catch (error) {
       console.log(error);
-      throw new Error(`Error finding all sessions: ${error.message}`);
+      throw error;
     }
   }
 
@@ -108,35 +113,34 @@ function sessionService(sessionModel) {
     try {
       let session = await sessionModel.findById(sessionId);
       if (!session) {
-        throw new Error("Session not found");
+        throw new NotFoundError("Session not found");
       }
       await sessionModel.findByIdAndDelete(sessionId);
     } catch (error) {
       console.log(error);
-      throw new Error(`Error deleting session: ${error.message}`);
+      throw error;
     }
   }
 
   async function findById(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
+      if (!session) throw new NotFoundError("Session not found");
+
       return session;
     } catch (error) {
       console.log(error);
-      throw new Error(`Error finding session by id: ${error.message}`);
+      throw error;
     }
   }
 
-
   // Função para cancelar uma sessão manualmente. A razão para existir um método de cancelamento
-  // manual é para permitir que o administrador do sistema possa cancelar uma sessão 
+  // manual é para permitir que o administrador do sistema possa cancelar uma sessão
   // por qualquer motivo que não seja a falta de vendas (irá ser feito método automático para tal).
   async function cancelSession(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
-      if (!session) {
-        throw new Error("Session not found");
-      }
+      if (!session) throw new NotFoundError("Session not found");
 
       const currentTime = new Date();
 
@@ -144,48 +148,32 @@ function sessionService(sessionModel) {
       const startTime = session.startTime;
       const oneHourBeforeStart = new Date(startTime.getTime() - 60 * 60 * 1000); // 1 hora antes do startTime
 
-
       if (session.status === sessionStatus.cancelled) {
-        throw new Error("Session already cancelled");
+        throw new ValidationError("Session already cancelled");
       }
 
       if (session.status === sessionStatus.finished) {
-        throw new Error("Session already finished");
+        throw new ValidationError("Session already finished");
       }
 
       // Verificar se a sessão pode ser cancelada
       if (currentTime > oneHourBeforeStart) {
-        throw new Error(
+        throw new ValidationError(
           "Cannot cancel the session less than 1 hour before the start time."
         );
       }
 
-      await sessionModel.findByIdAndUpdate(sessionId, { status: sessionStatus.cancelled });
-    }
-    catch (error) {
+      const cancelledSession = await sessionModel.findByIdAndUpdate(sessionId, {
+        status: sessionStatus.cancelled,
+      });
+      return cancelledSession;
+    } catch (error) {
       console.log(error);
-
-      if (error.message === "Session not found") {
-        throw new Error("Session not found");
-      }
-
-      if (error.message === "Cannot cancel the session less than 1 hour before the start time.") {
-        throw new Error("Cannot cancel the session less than 1 hour before the start time.");
-      }
-
-      if (error.message === "Session already cancelled") {
-        throw new Error("Session already cancelled");
-      }
-
-      if (error.message === "Session already finished") {
-        throw new Error("Session already finished");
-      }
-
-      throw new Error(`Error cancelling session: ${error.message}`);
+      throw error;
     }
   }
 
-  // Função para eliminar todas as sessões terminadas ou canceladas que já terminaram 
+  // Função para eliminar todas as sessões terminadas ou canceladas que já terminaram
   // uma hora depois de endTime.
   // Utilizado node-cron para agendar a execução desta função a cada 5 minutos.
   async function deleteSessions() {
@@ -201,6 +189,7 @@ function sessionService(sessionModel) {
     }
   }
 
+  // Rever esta função
   async function checkAvailability(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
@@ -220,7 +209,7 @@ function sessionService(sessionModel) {
   // para tal, será utilizado o node-cron para agendar a execução desta função!
   // A utilização do node-cron deverá ser feita no inicializador da aplicação (app.js) para ser
   // executado automáticamente em intervalos regulares!
-  // Para mais informação de node-cron, consultar documentação 
+  // Para mais informação de node-cron, consultar documentação
   // em https://www.npmjs.com/package/node-cron
   async function checkAndUpdateSessions() {
     try {
@@ -231,7 +220,10 @@ function sessionService(sessionModel) {
       await Session.updateMany(
         // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ou "cancelled" ($nin - not in)
         // então atualiza o status para "finished" ($set - set field)
-        { endTime: { $lt: currentTime }, status: { $nin: [sessionStatus.finished, sessionStatus.cancelled] } },
+        {
+          endTime: { $lt: currentTime },
+          status: { $nin: [sessionStatus.finished, sessionStatus.cancelled] },
+        },
         { $set: { status: sessionStatus.finished } }
       );
 
@@ -257,42 +249,43 @@ function sessionService(sessionModel) {
   }
 
   // Função para aplicar indisponibilidade a assentos específicos de uma sessão
-  async function applyUnavaliabilityToSeats(sessionId, seatNumbers) {
+  async function applyUnavailabilityToSeats(sessionId, seatNumbers) {
     try {
       let session = await sessionModel.findById(sessionId);
-      if (!session) {
-        throw new Error("Session not found");
+      if (!session) throw new NotFoundError("Session not found");
+      if(session.status === sessionStatus.finished || session.status === sessionStatus.cancelled) {
+        throw new ValidationError("Cannot apply unavailability to seats for a finished or cancelled session");
       }
 
+      
       // Obter o layout de assentos da sessão
       const seatLayout = session.seats;
 
       // Para cada número de assento fornecido, encontrar o assento correspondente
       // e definir o status como "inaccessible"
-      session.seats.forEach((seatNumber) => {
+      seatNumbers.forEach((seatNumber) => {
         // Percorrer o layout de assentos e encontrar o assento correspondente
         for (let i = 0; i < seatLayout.length; i++) {
           for (let j = 0; j < seatLayout[i].length; j++) {
             if (seatLayout[i][j].seat === seatNumber) {
               // Definir o status do assento como "inaccessible"
               seatLayout[i][j].status = seatStatus.inaccessible;
+            } else {
+              throw new NotFoundError("Seat not found in session");
             }
           }
         }
       });
 
+
+
       // Atualizar o layout de assentos da sessão
-      await sessionModel.findByIdAndUpdate(sessionId, { seats: seatLayout });
-    }
-    catch (error) {
+      session.seats = seatLayout;
+      await session.save();
+    } catch (error) {
       console.log(error);
-
-      if (error.message === "Session not found") {
-        throw new Error("Session not found");
-      }
-
-      throw new Error(`Error applying unavailability to seats: ${error.message}`);
-    } 
+      throw error;
+    }
   }
 
   /*

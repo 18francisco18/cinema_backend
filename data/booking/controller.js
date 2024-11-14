@@ -13,29 +13,29 @@ const bookingController = {
 }
 
 
-async function createBooking(req, res) {
+async function createBooking(req, res, next) {
     try {
         const booking = req.body;
         const { id } = req.params;
         const newBooking = await bookingService.create(booking, id);
         res.status(201).send(newBooking);
     } catch (error) {
-        next();
+        next(error);
     }
 }
 
-async function findAllBookings(req, res) {
+async function findAllBookings(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const result = await bookingService.findAll(page, limit);
     res.status(200).send(result);
   } catch (error) {
-    next();
+    next(error);
   }
 }
 
-async function findAllBookingsForSession(req, res) {
+async function findAllBookingsForSession(req, res, next) {
     try {
         const { sessionId } = req.params;
         const page = parseInt(req.query.page) || 1;
@@ -43,36 +43,36 @@ async function findAllBookingsForSession(req, res) {
         const result = await bookingService.findAllBookingsForSession(sessionId, page, limit);
         res.status(200).send(result);
     } catch (error) {
-        next();
+        next(error);
     }
 }
 
 
 // Controlador para buscar uma reserva pelo id
-async function getBookingById(req, res) {
+async function getBookingById(req, res, next) {
     try {
         const { id } = req.params;
         const booking = await bookingService.findById(id);
         res.status(200).send(booking);
     } catch (error) {
-       next();
+       next(error);
     }
 }
 
 
 // Controlador para remover uma reserva pelo id
-async function removeBookingById(req, res) {
+async function removeBookingById(req, res, next) {
     try {
         const { id } = req.params;
         await bookingService.removeById(id);
         res.status(204).send();
     } catch (error) {
-        next();
+        next(error);
     }
 }
 
 // Controlador para atualizar uma reserva pelo id
-async function updateBookingById(req, res) {
+async function updateBookingById(req, res, next) {
     try {
         const { id } = req.params;
         const booking = req.body;
@@ -80,7 +80,7 @@ async function updateBookingById(req, res) {
         res.status(200).send(updatedBooking);
     }
     catch (error) {
-        next();
+        next(error);
     }
 }
 
@@ -90,23 +90,23 @@ async function handlePaymentConfirmation(paymentIntentId) {
         await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {
         console.error("Erro ao confirmar pagamento:", error.message);
-        next();
+        next(error);
     }
 }
 
 
 // Controlador para cancelar uma reserva
-async function cancelReservation(req, res) {
+async function cancelReservation(req, res, next) {
     try {
         const { id } = req.params;
         await bookingService.cancelReservation(id);
         res.status(204).send();
     } catch (error) {
-        next();
+        next(error);
     }
 }
 
-async function refundTicketsFromBooking(req, res) {
+async function refundTicketsFromBooking(req, res, next) {
   try {
     const { bookingId } = req.params;
     const { ticketIds } = req.body;
@@ -114,7 +114,7 @@ async function refundTicketsFromBooking(req, res) {
     res.status(200).send();
   } catch (error) {
     console.log(error);
-    next();
+    next(error);
   }
 }
 

@@ -10,37 +10,30 @@ const roomController = {
   updateSeatStatus,
 };
 
-async function createRoom(req, res) {
+async function createRoom(req, res, next) {
   try {
     const room = req.body;
     const newRoom = await roomService.create(room);
     res.status(201).send(newRoom);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 }
 
 // Controlador para buscar uma sala pelo id
-async function getRoomById(req, res) {
+async function getRoomById(req, res, next) {
   try {
     const { id } = req.params;
     const room = await roomService.findById(id);
     res.status(200).send(room);
   } catch (error) {
-    console.log(error);
-    // Caso o erro deva-se ao facto de não encontrar o id, transmite o erro 404.
-    if (error.message === "Room not found") {
-      res.status(404).json({ error: error.message });
-    } else {
-      // Caso o problema seja algo que não seja o id não encontrado, transmite o erro 500.
-      res.status(500).json({ error: "Internal Server Error" });
-    }
+    next(error);
   }
 }
 
 // Controlador para buscar todas as salas
-async function getAllRooms(req, res) {
+async function getAllRooms(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -48,65 +41,40 @@ async function getAllRooms(req, res) {
     res.status(200).send(rooms);
   } catch (error) {
     console.log(error);
-    res.status(500).send(error);
+    next(error);
   }
 }
 
-async function removeRoomById(req, res) {
+async function removeRoomById(req, res, next) {
   try {
     const { id } = req.params;
     await roomService.removeById(id);
     res.status(204).send();
     console.log("Room removed");
   } catch (error) {
-    // Caso o erro deva-se ao facto de não encontrar o id, transmite o erro 404.
-    if (error.message === "Room not found") {
-      res.status(404).json({ error: error.message });
-    } else {
-      // Caso o problema seja algo que não seja o id não encontrado, transmite o erro 500.
-      res.status(500).json({ error: "Internal Server Error" });
-    }
+    next(error);
   }
 }
 
-async function updateRoomById(req, res) {
+async function updateRoomById(req, res, next) {
   try {
     const { id } = req.params;
     const room = req.body;
     const updatedRoom = await roomService.updateById(id, room);
     res.status(200).send(updatedRoom);
   } catch (error) {
-    // Caso o erro deva-se ao facto de não encontrar o id, transmite o erro 404.
-    if (error.message === "Room not found") {
-      res.status(404).json({ error: error.message });
-    } else {
-      // Caso o problema seja algo que não seja o id não encontrado, transmite o erro 500.
-      res.status(500).json({ error: "Internal Server Error" });
-    }
+    next(error);
   }
 }
 
-async function updateSeatStatus(req, res) {
+async function updateSeatStatus(req, res, next) {
   try {
     const { id } = req.params;
     const seat = req.body;
     const updatedRoom = await roomService.updateSeatStatus(id, seat);
     res.status(200).send(updatedRoom);
   } catch(error) {
-    if (error.message === "Room not found") {
-      res.status(404).json({ error: "Room not found" });
-    } 
-
-    if (error.message === "Invalid seat status") {
-      res.status(404).json({ error: "Invalid seat status" });
-    } 
-
-    if (error.message === "Invalid seat number") {
-      res.status(404).json({ error: "Invalid seat number" });
-    } 
-
-    res.status(500).json({ error: "Internal Server Error" });
-
+    next(error);
   }
 }
 

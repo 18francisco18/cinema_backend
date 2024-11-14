@@ -13,7 +13,7 @@ const sessionsController = {
 }
 
 // Controlador para criar uma nova sessão
-async function createSession(req, res) {
+async function createSession(req, res, next) {
   try {
     const { room, movie, date, price, startTime, endTime } = req.body;
 
@@ -26,22 +26,11 @@ async function createSession(req, res) {
       session
     });
   } catch (error) {
-    console.error(error.message);
-
-    // Lidar com erros (por exemplo, sala não encontrada ou falha ao criar a sessão)
-    if (error.message === 'Room not found') {
-      return res.status(404).json({ error: 'Sala não encontrada' });
-    }
-
-    if (error.message === 'Movie not found') {
-      return res.status(404).json({ error: 'Filme não encontrado' });
-    }
-
-    res.status(500).json({ error: 'Erro ao criar a sessão' });
+    next(error);
   }
 }
 
-async function cancelSession(req, res) {
+async function cancelSession(req, res, next) {
   try {
     const { id } = req.params;
 
@@ -51,159 +40,92 @@ async function cancelSession(req, res) {
     // Se a sessão foi cancelada com sucesso, retornar uma mensagem de sucesso
     res.status(200).json({ message: 'Sessão cancelada com sucesso' });
   } catch (error) {
-    console.error(error.message);
-
-    // Lidar com erros (por exemplo, sessão não encontrada ou falha ao cancelar a sessão)
-    if (error.message === 'Session not found') {
-      return res.status(404).json({ error: 'Sessão não encontrada' });
-    }
-
-    if (error.message === "Cannot cancel the session less than 1 hour before the start time.") {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Cannot cancel the session less than 1 hour before the start time.",
-        });
-    }
-
-    if (error.message === 'Session already cancelled') {
-      return res.status(400).json({ error: "Session already cancelled" });
-    }
-
-    if (error.message === 'Session already finished') {
-      return res.status(400).json({ error: 'Session already finished' });
-    }
-
-    res.status(500).json({ error: 'Error cancelling the session' });
+    next(error);
   }
 }
 
-async function getSessions(req, res) {
+async function getSessions(req, res, next) {
   try {
     const sessions = await sessionService.findAll();
-
     res.status(200).json(sessions);
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error getting sessions' });
+    next(error);
   }
 }
 
-async function getSessionById(req, res) {
+async function getSessionById(req, res, next) {
   try {
     const { id } = req.params;
-
     const session = await sessionService.findById(id);
-
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-
     res.status(200).json(session);
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error getting session' });
+    next(error);
   }
 }
 
-async function deleteSession(req, res) {
+async function deleteSession(req, res, next) {
   try {
     const { id } = req.params;
-
     const session = await sessionService.deleteSession(id);
-
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-
     res.status(200).json({
       message: 'Session deleted successfully',
       session
     });
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error deleting session' });
+    next(error);
   }
 }
 
-async function checkAvailability(req, res) {
+async function checkAvailability(req, res, next) {
   try {
     const { id } = req.params;
-
     const isAvailable = await sessionService.checkAvailability(id);
-
     res.status(200).json({ available: isAvailable });
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error checking availability' });
+    next(error);
   }
 }
 
-async function deleteSession(req, res) {
+async function deleteSession(req, res, next) {
   try {
     const { id } = req.params;
-
     const session = await sessionService.deleteSession(id);
-
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
-
     res.status(200).json({
       message: 'Session deleted successfully',
       session
     });
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error deleting session' });
+    next(error);
   }
 }
 
-async function checkAndUpdateSessions(req, res) {
+async function checkAndUpdateSessions(req, res, next) {
   try {
     await sessionService.checkAndUpdateSessions();
-
     res.status(200).json({ message: 'Sessions updated successfully' });
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error updating sessions' });
+    next(error);
   }
 }
 
-async function applyUnavaliabilityToSeats(req, res) {
+async function applyUnavaliabilityToSeats(req, res, next) {
   try {
     const { id } = req.params;
-
     const { seats } = req.body;
-
     await sessionService.applyUnavaliabilityToSeats(id, seats);
-
     res.status(200).json({ message: 'Unavaliability applied to seats successfully' });
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error applying unavaliability to seats' });
+    next(error);
   }
 }
 
-async function getSessionsReport(req, res) {
+async function getSessionsReport(req, res, next) {
   try {
     const { id } = req.params;
-
     const sessionsReport = await sessionService.generateSessionReport(id);
-
     res.status(200).json(sessionsReport);
   } catch (error) {
-    console.error(error.message);
-
-    res.status(500).json({ error: 'Error getting sessions report' });
+    next(error);
   }
 }
 
