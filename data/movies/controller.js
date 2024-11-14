@@ -22,7 +22,7 @@ async function searchMovie(req, res, next) {
   try {
     const { title, year, plot } = req.body; // Extrai o título e o ano da requisição
     const movie = movieService.searchMovie(title, year, plot); // Chama o serviço que faz a requisição à OMDb API
-    res.status(201).send(movie); // Retorna o filme recém-salvo
+    res.status(201).json(movie); // Retorna o filme recém-salvo
   } catch (error) {
     console.log(error);
     next(error);

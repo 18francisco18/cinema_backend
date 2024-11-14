@@ -162,7 +162,7 @@ function MovieService(movieModel) {
 
     try {
       // Verifica se o filme já está no banco de dados
-      const existingMovie = await movieModel.findOne({ title: movie.title, year: movie.year });
+      const existingMovie = await movieModel.findOne({ title: title, year: year });
       if (existingMovie) {
         console.log(
           "Filme já existe no banco de dados, acedendo à base de dados..."
