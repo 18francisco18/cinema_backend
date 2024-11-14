@@ -84,14 +84,21 @@ function BookingRouter() {
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
   // Outras rotas normais
-  router.post("/:id/create", bookingController.createBooking);
+
   router.get("/find/:id", bookingController.getBookingById);
   router.get("/findAll", bookingController.findAllBookings);
-  router.delete("/remove/:id", bookingController.removeBookingById);
+  router.get("/:sessionId/findAll", bookingController.findAllBookingsForSession);
+
   router.put("/update/:id", bookingController.updateBookingById);
+
+  router.post("/:id/create", bookingController.createBooking);
   router.post("/:id/cancelReservation", bookingController.cancelReservation);
   router.post("/:bookingId/refundTickets", bookingController.refundTicketsFromBooking);
-  router.get("/:sessionId/findAll", bookingController.findAllBookingsForSession);
+  
+  router.delete("/remove/:id", bookingController.removeBookingById);
+  
+  
+  
 
   return router;
 }

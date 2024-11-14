@@ -8,17 +8,17 @@ function RoomsRouter() {
   router.use(bodyParser.json({ limit: "100mb" }));
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-  router.post("/create", roomsController.createRoom);
-
   router.get("/find/:id", roomsController.getRoomById);
-
   router.get("/findAll", roomsController.getAllRooms);
+
+  router.put("/update/:id", roomsController.updateRoomById);
+  router.put("/:id/updateSeatStatus", roomsController.updateSeatStatus);
+
+  router.post("/create", roomsController.createRoom);
 
   router.delete("/remove/:id", roomsController.removeRoomById);
 
-  router.put("/update/:id", roomsController.updateRoomById);
-
-  router.put("/:id/updateSeatStatus", roomsController.updateSeatStatus);
+  
 
   return router;
 }

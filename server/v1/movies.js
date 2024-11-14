@@ -8,11 +8,10 @@ function MoviesRouter() {
   router.use(bodyParser.json({ limit: "100mb" }));
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-  router.post("/search", movieController.searchMovie);
-
   router.get("/", movieController.getAllMovies);
-
   router.get("/findById/:id", movieController.getMovieById);
+
+  router.post("/search", movieController.searchMovie);
 
   router.delete("/remove/:id", movieController.removeMovie);
 

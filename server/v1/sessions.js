@@ -8,18 +8,19 @@ function SessionsRouter() {
   router.use(bodyParser.json({ limit: "100mb" }));
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-  router.post("/create", sessionsController.createSession);
-  router.put("/:id/cancelSession", sessionsController.cancelSession);
   router.get("/", sessionsController.getSessions);
   router.get("/:id", sessionsController.getSessionById);
-  router.delete("/:id", sessionsController.deleteSession);
-  router.post("/checkAvailability", sessionsController.checkAvailability);
-  router.put(
-    "/:id/applyUnavailability",
-    sessionsController.applyUnavaliabilityToSeats
-  );
-    router.get("/:id/report", sessionsController.getSessionsReport);
+  router.get("/:id/report", sessionsController.getSessionsReport);
 
+  router.put("/:id/cancelSession", sessionsController.cancelSession);
+  router.put("/:id/applyUnavailability", sessionsController.applyUnavaliabilityToSeats);
+
+  router.post("/create", sessionsController.createSession);
+  router.post("/checkAvailability", sessionsController.checkAvailability);
+  
+  router.delete("/:id", sessionsController.deleteSession);
+  
+  
   return router;
 }
 

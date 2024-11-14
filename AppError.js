@@ -137,6 +137,12 @@ class ServiceUnavailableError extends AppError {
 
 }
 
+class PaymentRequiredError extends AppError {
+    constructor(description = 'Payment Required') {
+        super('PaymentRequiredError', AppError.HttpCode.PAYMENT_REQUIRED, description)
+    }
+}
+
 module.exports = {
     AppError,
     ValidationError,
@@ -145,5 +151,6 @@ module.exports = {
     NotFoundError,
     ConflictError,
     DatabaseError,
-    ServiceUnavailableError
+    ServiceUnavailableError,
+    PaymentRequiredError
 }

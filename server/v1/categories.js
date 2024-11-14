@@ -8,9 +8,14 @@ function CategoriesRouter() {
     router.use(bodyParser.json({ limit: "100mb" }));
     router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-    router.post("/create", productsController.createCategory);
     router.get("/all", productsController.findAllCategories);
     router.get("/find/:id", productsController.findCategoryById);
+    // Fazer rota para buscar produtos de uma categoria
+
+    // Fazer rota para atualizar categoria
+
+    router.post("/create", productsController.createCategory);
+    
     router.delete("/remove/:id", productsController.removeCategoryById);
 
     return router;
