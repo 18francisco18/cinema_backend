@@ -95,14 +95,27 @@ function sessionService(sessionModel) {
 
   // Função para buscar todas as sessões
   // falta fazer paginação e sorting.
-  async function findAll() {
+  async function findAll(page = 1, limit = 10) {
     try {
-      let sessions = await sessionModel.find();
+
+      const skip = (page - 1) * limit;
+      let sessions = await sessionModel.find().skip(skip).limit(limit);
+      const total = await sessions.countDocuments();
+      const totalPages = Math.ceil(total / limit);
 
       if (!sessions) throw new DatabaseError("Error finding all sessions");
       if (sessions.length === 0) throw new NotFoundError("No sessions found");
+      if (page > totalPages) {
+        return { sessions: [], total: 0, page, limit };
+      }
 
-      return sessions;
+      return {
+        sessions,
+        total,
+        totalPages,
+        currentPage: page,
+        limit,
+      };
     } catch (error) {
       console.log(error);
       throw error;

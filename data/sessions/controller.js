@@ -46,7 +46,9 @@ async function cancelSession(req, res, next) {
 
 async function getSessions(req, res, next) {
   try {
-    const sessions = await sessionService.findAll();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const sessions = await sessionService.findAll(page, limit);
     res.status(200).json(sessions);
   } catch (error) {
     next(error);
