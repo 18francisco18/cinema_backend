@@ -283,6 +283,8 @@ function bookingService(bookingModel) {
         // Criar um relatório de pagamento interno
         await financialReportController.createInternalPaymentReport(report);
 
+        //generateInvoice(booking);
+
         return { message: "Payment confirmed, QR Code sent", booking };
       } else {
         throw new PaymentRequiredError("Payment not confirmed");
@@ -412,6 +414,78 @@ function bookingService(bookingModel) {
       throw error;
     }
   }
+
+  /*
+  // Função para remover referências circulares de um objeto
+  function removeCircularReferences(obj) {
+    const seen = new WeakSet();
+    return JSON.parse(
+      JSON.stringify(obj, (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) {
+            return;
+          }
+          seen.add(value);
+        }
+        return value;
+      })
+    );
+  }
+
+  // Função para gerar um invoice a partir de uma reserva
+  async function generateInvoice(booking) {
+    try {
+      // Buscar a reserva populada para obter os dados necessários
+      const populatedBooking = await bookingModel.findById(booking._id).populate({ 
+          path: "session", 
+          populate: [
+              { path: "movie", select: "title" },
+              { path: "room", select: "name", populate: { path: "cinema", select: "name" } }
+          ] 
+      });
+
+      // Extrair os dados necessários de `populatedBooking`
+      const movieTitle = populatedBooking.session.movie.title;
+      const cinemaName = populatedBooking.session.room.cinema.name;
+      const seats = populatedBooking.seats.join(", ");
+      const startTime = populatedBooking.session.startTime;
+      const totalAmount = populatedBooking.totalAmount * 100; // Em centavos
+
+      // 1. Criar um invoiceItem para o valor da reserva
+      await stripe.invoiceItems.create({
+          customer: booking.user, // ID do cliente no Stripe
+          amount: totalAmount, // Valor total em centavos
+          currency: "eur",
+          description: `Movie Ticket for ${movieTitle} - Seats: ${seats} - StartTime: ${startTime}`,
+      });
+
+      // 2. Criar a invoice para o cliente, associando o invoiceItem criado
+      const invoice = await stripe.invoices.create({
+          customer: booking.user, // ID do cliente no Stripe
+          auto_advance: true, // Avançar automaticamente para cobrança
+          collection_method: "charge_automatically", // Método de cobrança automática
+          payment_settings: { payment_method_types: ["card"] }, // Tipos de pagamento aceitos
+          customer_email: booking.user.email, // E-mail do cliente
+          description: `Invoice for Movie Ticket - ${movieTitle}`, // Descrição da fatura
+          custom_fields: [ // Campos personalizados
+              { name: "Movie", value: String(movieTitle) },
+              { name: "Cinema", value: String(cinemaName) },
+          ],
+      });
+
+      console.log("Dados do Invoice:", invoice);
+
+      // Remover referências circulares do invoice
+      const cleanedInvoice = removeCircularReferences(invoice);
+
+      // Retornar o invoice gerado
+      return cleanedInvoice;
+    } catch (error) {
+        console.error("Erro ao gerar invoice:", error);
+        throw new Error("Falha ao gerar invoice");
+    }
+  }
+  */
 
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {

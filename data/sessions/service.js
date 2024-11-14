@@ -19,7 +19,7 @@ function sessionService(sessionModel) {
     cancelSession,
     deleteSessions,
     applyUnavaliabilityToSeats,
-    generateSessionReport,
+    //generateSessionReport,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -295,6 +295,7 @@ function sessionService(sessionModel) {
     } 
   }
 
+  /*
   // Função para gerar um relatório de sessão
   async function generateSessionReport(sessionId) {
     try {
@@ -369,6 +370,7 @@ function sessionService(sessionModel) {
       throw new Error(`Error generating session report: ${error.message}`);
     }
   }
+  */
 
   return service;
 }

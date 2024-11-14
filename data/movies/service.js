@@ -135,8 +135,8 @@ function MovieService(movieModel) {
         totalMovies,
       };
     } catch (err) {
-      console.log(err);
-      throw error;
+        console.log(err);
+        throw err;
     }
   }
 
@@ -150,39 +150,7 @@ function MovieService(movieModel) {
       return movie;
     } catch (err) {
       console.log(err);
-      throw error;
-    }
-  }
-
-  async function searchMovie(title, year, plot) {
-    // Verifica se o título do filme foi fornecido
-    if (!title) {
-      throw new ValidationError("Por favor, forneça o título do filme.");
-    }
-
-    try {
-      // Verifica se o filme já está no banco de dados
-      const existingMovie = await movieModel.findOne({ title: movie.title, year: movie.year });
-      if (existingMovie) {
-        console.log(
-          "Filme já existe no banco de dados, acedendo à base de dados..."
-        );
-        return existingMovie; // Se o filme já existe, retorna-o
-      }
-
-      // Chama o serviço que faz a requisição à OMDb API
-      const movie = await movieModel.getMovieByTitleYearAndPlot(
-        title,
-        year,
-        plot
-      );
-
-      // Se não existir, salva no banco de dados
-      const newMovie = await movieModel.create(movie);
-      return newMovie;
-    } catch (error) {
-      console.log(error);
-      throw error;
+      throw(err);
     }
   }
 
