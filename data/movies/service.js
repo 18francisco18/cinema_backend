@@ -126,7 +126,7 @@ function MovieService(movieModel) {
       };
     } catch (err) {
         console.log(err);
-        throw(error);
+        throw err;
     }
   }
 
@@ -140,7 +140,7 @@ function MovieService(movieModel) {
       return movie;
     } catch (err) {
       console.log(err);
-      throw(error);
+      throw(err);
     }
   }
 
