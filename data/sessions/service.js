@@ -5,6 +5,8 @@ const Movie = require("../movies/movies");
 const seatStatus = require("./seatStatus");
 const sessionStatus = require("./sessionStatus");
 const sessionReport = require("./sessionReport");
+const booking = require("../booking/booking");
+const ticketModel = require("../tickets/tickets");
 
 function sessionService(sessionModel) {
   let service = {
@@ -17,7 +19,7 @@ function sessionService(sessionModel) {
     cancelSession,
     deleteSessions,
     applyUnavaliabilityToSeats,
-    generateSessionReport,
+    //generateSessionReport,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -36,6 +38,19 @@ function sessionService(sessionModel) {
       const movie = await Movie.findById(movieId);
       if (!movie) {
         throw new Error("Movie not found");
+      }
+
+      // Verificar se já existe uma sessão com o mesmo filme, sala e data
+      const existingSession = await Session.findOne({
+        room: roomId,
+        movie: movieId,
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+      });
+
+      if (existingSession) {
+        throw new Error("Session already exists for the same movie, room, and time");
       }
 
       // Acessar o layout de assentos da Room e mapear para a Session
@@ -280,6 +295,7 @@ function sessionService(sessionModel) {
     } 
   }
 
+  /*
   // Função para gerar um relatório de sessão
   async function generateSessionReport(sessionId) {
     try {
@@ -288,88 +304,73 @@ function sessionService(sessionModel) {
         throw new Error("Session not found");
       }
 
-      // Obter o número total de assentos da sala
-      let room = await RoomModel.findById(session.room);
-      if (!room) {
-        throw new Error("Room not found");
-      }
+      // Obter os bilhetes vendidos para a sessão
+      let tickets = await ticketModel.find({ "booking.session": sessionId });
+      console.log(tickets);
 
-      let totalSeats = room.seats;
-
-      // Obter o número total de assentos vendidos
-      let tickets = await sessionModel.findById(sessionId).populate("tickets");
-      let ticketsSold = tickets.length;
-
-      // Obter o número total de cancelamentos
-      let cancellations = await sessionModel.findById(sessionId).populate("cancellations");
-      let cancellationsTotal = cancellations.length;
-
-      // Obter o número de cancelamentos por período
-      let cancellationsBefore2Hours = 0;
-      let cancellationsBetween2HoursAnd30Minutes = 0;
-      let cancellationsAfter30Minutes = 0;
-
-      cancellations.forEach((cancellation) => {
-        const cancellationTime = cancellation.createdAt;
-        const timeDifference = (session.startTime - cancellationTime) / 1000 / 60; // Diferença em minutos
-
-        if (timeDifference >= 120) {
-          cancellationsBefore2Hours++;
-        } else if (timeDifference >= 30) {
-          cancellationsBetween2HoursAnd30Minutes++;
-        } else {
-          cancellationsAfter30Minutes++;
+      // Calcular o total de bilhetes vendidos
+      const ticketsSold = tickets.reduce((count, ticket) => {
+        if (ticket.status === "booked" && ticket.booking.session.equals(sessionId)) {
+          return count + 1;
         }
-      });
+        return count;
+      }, 0);
 
-      // Obter o valor total gerado com a venda de ingressos
-      let ticketAmountGenerated = ticketsSold * session.price;
+      // Calcular o total de bilhetes vendidos para todas as sessões
+      const totalTicketsSold = await tickets.find().countDocuments();
 
-      // Obter o valor total gerado com cancelamentos
-      let cancellationAmountGenerated = cancellationsTotal * session.price;
+      // Calcular o total de cancelamentos
+      const cancellationsTotal = tickets.filter(ticket => ticket.status === "cancelled").length;
 
-      // Obter o valor total gerado
-      let totalAmountGenerated = ticketAmountGenerated - cancellationAmountGenerated;
+      // Calcular o total de cancelamentos por período
+      const cancellationsPeriods = {
+        before2Hours: tickets.filter(ticket => ticket.status === "cancelled" || "refunded" && ticket.cancelledAt.getTime() - session.startTime.getTime() > 2 * 60 * 60 * 1000).length,
+        between2HoursAnd30Minutes: tickets.filter(ticket => ticket.status === "cancelled" || "refunded" && ticket.cancelledAt.getTime() - session.startTime.getTime() <= 2 * 60 * 60 * 1000 && ticket.cancelledAt.getTime() - session.startTime.getTime() > 30 * 60 * 1000).length,
+        after30Minutes: tickets.filter(ticket => ticket.status === "cancelled" || "refunded" && ticket.cancelledAt.getTime() - session.startTime.getTime() <= 30 * 60 * 1000).length,
+      };
 
-      // Obter o número de assentos não vendidos
-      let seatsUnsold = totalSeats - ticketsSold;
+      // Calcular o montante total gerado com bilhetes
+      const ticketAmountGenerated = ticketsSold * session.price;
 
-      // Gerar o relatório da sessão
-      sessionReport = new sessionReport({
+      // Calcular o montante total gerado com cancelamentos
+      const cancellationAmountGenerated = cancellationsTotal * session.price;
+
+      // Calcular o montante total gerado
+      const totalAmountGenerated = ticketAmountGenerated - cancellationAmountGenerated;
+
+      // Calcular o total de assentos não vendidos
+      const seatsUnsold = session.seats.flat().filter(seat => seat.status === "available").length;
+
+      // Criar um novo relatório de sessão com os dados calculados
+      const newSessionReport = new sessionReport({
         sessionId: sessionId,
         sessionTicketPrice: session.price,
         ticketsSold: ticketsSold,
-        totalTicketsSold: ticketsSold,
+        totalTicketsSold: totalTicketsSold,
         cancellationsTotal: cancellationsTotal,
-        cancellationsPeriods: {
-          before2Hours: cancellationsBefore2Hours,
-          between2HoursAnd30Minutes: cancellationsBetween2HoursAnd30Minutes,
-          after30Minutes: cancellationsAfter30Minutes,
-        },
+        cancellationsPeriods: cancellationsPeriods,
         ticketAmountGenerated: ticketAmountGenerated,
         cancellationAmountGenerated: cancellationAmountGenerated,
         totalAmountGenerated: totalAmountGenerated,
         seatsUnsold: seatsUnsold,
       });
 
-      // Salvar o relatório da sessão no banco de dados
-      await sessionReport.save();
-      return sessionReport;
-    }
-    catch (error) {
+      // Salvar o relatório de sessão no banco de dados
+      await newSessionReport.save();
+
+      return newSessionReport;
+
+    } catch (error) {
       console.log(error);
 
       if (error.message === "Session not found") {
         throw new Error("Session not found");
       }
 
-      if (error.message === "Room not found") {
-        throw new Error("Room not found");
-      }
-
       throw new Error(`Error generating session report: ${error.message}`);
     }
   }
+  */
 
   return service;
 }

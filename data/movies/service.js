@@ -1,15 +1,24 @@
 const axios = require("axios");
 const mongoose = require("mongoose");
 const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+} = require("../../AppError");
 
 function MovieService(movieModel) {
   let service = {
     create,
     getMovieByTitleYearAndPlot,
-    getMoviesByGenre,
     findById,
     findAll,
     removeById,
+    searchMovie,
   };
 
   async function create(movie) {
@@ -19,7 +28,7 @@ function MovieService(movieModel) {
       return savedMovie;
     } catch (error) {
       console.log(error);
-      throw new Error(`Erro ao criar o filme: ${error.message}`);
+      throw error;
     }
   }
 
@@ -49,11 +58,11 @@ function MovieService(movieModel) {
       // Retorna os dados do filme
       const movieData = response.data;
 
-      // O objetivo deste código é transformar o array de avaliações (Ratings) retornado pela API OMDb para garantir que cada 
-      //objeto de avaliação tenha os campos source e value preenchidos, 
+      // O objetivo deste código é transformar o array de avaliações (Ratings) retornado pela API OMDb para garantir que cada
+      //objeto de avaliação tenha os campos source e value preenchidos,
       //mesmo que a API não os forneça.
       //Primeiro acede-se ao array de avaliações com movieData.Ratings (seguido de OU [] para caso seja null ou undefined).
-      //Depois, mapeia-se o array de avaliações, transformando cada objeto de avaliação (rating) 
+      //Depois, mapeia-se o array de avaliações, transformando cada objeto de avaliação (rating)
       //em um objeto com os campos source e value preenchidos.
       const transformedRatings = (movieData.Ratings || []).map((rating) => ({
         source: rating.Source || "N/A",
@@ -92,38 +101,8 @@ function MovieService(movieModel) {
       // Retorna os dados completos do filme
       return completeMovieData;
     } catch (error) {
-      console.log(error)
-      throw new Error(`Erro ao buscar o filme: ${error.message}`);
-    }
-  }
-
-  // Função para buscar filmes por género na API OMDb
-  async function getMoviesByGenre(genre) {
-    try {
-      const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
-        params: {
-          genre: genre,
-          apikey: MOVIE_API_KEY,
-        },
-      });
-
-      if (response.data.Response === "False") {
-        throw new Error(response.data.Error);
-      }
-
-      const moviesData = response.data.Search;
-
-      const movies = moviesData.map((movieData) => ({
-        title: movieData.Title,
-        year: movieData.Year,
-        imdbID: movieData.imdbID,
-        type: movieData.Type,
-        poster: movieData.Poster,
-      }));
-
-      return movies;
-    } catch (error) {
-      throw new Error(`Erro ao buscar os filmes: ${error.message}`);
+      console.log(error);
+      throw error;
     }
   }
 
@@ -132,21 +111,23 @@ function MovieService(movieModel) {
     try {
       const movie = await movieModel.findById(id);
       if (!movie) {
-        throw new Error("Filme não encontrado");
+        throw new NotFoundError("Filme não encontrado");
       }
       return movie;
     } catch (err) {
-      throw new Error("Erro ao buscar o filme");
+      console.log(err);
+      throw err;
     }
   }
 
   // Função para buscar todos os filmes no banco de dados
   async function findAll(page, limit) {
     try {
-      const movies = await movieModel.find()
+      const movies = await movieModel
+        .find()
         .skip((page - 1) * limit)
         .limit(limit);
-        const totalMovies = await movieModel.countDocuments();
+      const totalMovies = await movieModel.countDocuments();
       return {
         movies,
         totalPages: Math.ceil(totalMovies / limit),
@@ -154,7 +135,8 @@ function MovieService(movieModel) {
         totalMovies,
       };
     } catch (err) {
-      throw new Error("Erro ao buscar os filmes");
+        console.log(err);
+        throw err;
     }
   }
 
@@ -163,16 +145,48 @@ function MovieService(movieModel) {
     try {
       const movie = await movieModel.findByIdAndDelete(id);
       if (!movie) {
-        throw new Error("Filme não encontrado");
+        throw new NotFoundError("Filme não encontrado");
       }
       return movie;
     } catch (err) {
       console.log(err);
-      throw new Error("Erro ao remover o filme");
+      throw err;
+    }
+  }
+
+  async function searchMovie(title, year, plot) {
+    // Verifica se o título do filme foi fornecido
+    if (!title) {
+      throw new ValidationError("Por favor, forneça o título do filme.");
+    }
+
+    try {
+      // Verifica se o filme já está no banco de dados
+      const existingMovie = await movieModel.findOne({ title: title, year: year });
+      if (existingMovie) {
+        console.log(
+          "Filme já existe no banco de dados, acedendo à base de dados..."
+        );
+        return existingMovie; // Se o filme já existe, retorna-o
+      }
+
+      // Chama o serviço que faz a requisição à OMDb API
+      const movie = await getMovieByTitleYearAndPlot(
+        title,
+        year,
+        plot
+      );
+
+      // Se não existir, salva no banco de dados
+      const newMovie = await movieModel.create(movie);
+      return newMovie;
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   }
 
   return service;
 }
 
-module.exports = MovieService
+module.exports = MovieService;
