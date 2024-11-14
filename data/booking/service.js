@@ -11,6 +11,16 @@ const dotenv = require("dotenv");
 const Session = require("../sessions/sessions");
 const Product = require("../products/product");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const {
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  ServiceUnavailableError,
+  PaymentRequiredError,
+} = require("../../AppError");
 
 dotenv.config();
 
@@ -49,27 +59,27 @@ function bookingService(bookingModel) {
 
       // Caso a sessão não exista, lançar um erro.
       if (!sessionData) {
-        throw new Error("Session not found");
+        throw new NotFoundError("Session not found");
       }
 
       // Caso a sessão esteja cheia, lançar um erro.
       if (sessionData.status === sessionStatus.soldOut) {
-        throw new Error("Session is already sold out");
+        throw new ConflictError("Session is sold out");
       }
 
       // Caso a sessão esteja cancelada, lançar um erro.
       if (sessionData.status === sessionStatus.cancelled) {
-        throw new Error("Session is cancelled");
+        throw new ValidationError("Session is cancelled");
       }
 
       // Caso a sessão esteja finalizada, lançar um erro.
       if (sessionData.status === sessionStatus.finished) {
-        throw new Error("Session is finished");
+        throw new ValidationError("Session is finished");
       }
 
-      // Caso a sessão esteja em andamento, lançar um erro.
+      // Caso a sessão esteja no passado, lançar um erro.
       if (new Date(sessionData.endTime) < new Date()) {
-        throw new Error("Cannot book a session in the past");
+        throw new ValidationError("Cannot book a session in the past");
       }
 
       // Obter a lista de assentos da sessão especificada.
@@ -83,7 +93,7 @@ function bookingService(bookingModel) {
 
       // Se existirem assentos inválidos, lançar um erro.
       if (invalidSeats.length > 0) {
-        throw new Error(
+        throw new ValidationError(
           `The following seats are invalid or unavailable: ${invalidSeats.join(
             ", "
           )}`
@@ -138,34 +148,7 @@ function bookingService(bookingModel) {
       await session.abortTransaction(); // Cancelar a transação em caso de erro.
       session.endSession(); // Encerrar a sessão.
       console.log(error);
-
-      if (error.message === "Session not found") {
-        throw new Error("Session not found");
-      }
-
-      if (error.message === "Session is already sold out") {
-        throw new Error("Session is already sold out");
-      }
-
-      if (error.message === "Session is cancelled") {
-        throw new Error("Session is cancelled");
-      }
-
-      if (error.message === "Session is finished") {
-        throw new Error("Session is finished");
-      }
-
-      if (error.message === "Cannot book a session in the past") {
-        throw new Error("Cannot book a session in the past");
-      }
-
-      if (
-        error.message.includes("The following seats are invalid or unavailable")
-      ) {
-        throw new Error(error.message);
-      }
-
-      throw new Error("Check for missing fields or wrong fields");
+      throw error;
     }
   }
 
@@ -177,7 +160,7 @@ function bookingService(bookingModel) {
         try {
           const booking = await bookingModel.findById(bookingId);
           if (!booking) {
-            throw new Error("Booking not found");
+            throw new NotFoundError("Booking not found");
           }
 
           // Verificar se o status do pagamento é "pending"
@@ -212,7 +195,7 @@ function bookingService(bookingModel) {
       return { message: "Booking deletion scheduled in 5 minutes" };
     } catch (error) {
       console.error("Error scheduling booking deletion:", error);
-      throw new Error("Error scheduling booking deletion");
+      throw error;
     }
   }
 
@@ -224,7 +207,7 @@ function bookingService(bookingModel) {
         paymentIntentId.id
       );
       if (!paymentIntent) {
-        throw new Error("Payment Intent não encontrado");
+        throw new NotFoundError("Payment Intent não encontrado");
       }
 
       // Verificar se o pagamento foi realizado com sucesso
@@ -232,14 +215,11 @@ function bookingService(bookingModel) {
         const bookingId = paymentIntent.metadata
           ? paymentIntent.metadata.bookingId
           : null;
-        if (!bookingId) {
-          console.log("Booking ID não encontrado nos metadados");
-        }
 
         // Buscar a reserva com o ID fornecido
         const booking = await bookingModel.findById(bookingId).populate("user");
         if (!booking) {
-          throw new Error("Booking not found");
+          throw new NotFoundError("Booking not found");
         }
 
         // Atualizar o status de pagamento para "paid"
@@ -307,11 +287,11 @@ function bookingService(bookingModel) {
 
         return { message: "Payment confirmed, QR Code sent", booking };
       } else {
-        throw new Error("Payment not confirmed");
+        throw new PaymentRequiredError("Payment not confirmed");
       }
     } catch (error) {
       console.error("Error confirming payment:", error);
-      throw new Error("Error during payment confirmation");
+      throw error;
     }
   }
 
@@ -331,11 +311,11 @@ function bookingService(bookingModel) {
           },
         });
       if (!session) {
-        throw new Error("Session not found");
+        throw new NotFoundError("Session not found");
       }
 
       if (!booking.user._id) {
-        throw new Error("User not found");
+        throw new NotFoundError("User not found");
       }
 
       const products = await Product.find({
@@ -367,6 +347,8 @@ function bookingService(bookingModel) {
             : product.price;
           console.log(`Is Discount Valid: ${isDiscountValid}`);
           console.log(`Price to charge: ${priceToCharge}`); // Adicione um log para verificar o preço
+
+          
 
           // Adicionar o produto ao line_items com a quantidade correta
           line_items.push({
@@ -429,7 +411,7 @@ function bookingService(bookingModel) {
       return { url: paymentSession.url };
     } catch (error) {
       console.error("Error creating payment session:", error);
-      throw new Error("Failed to create payment session");
+      throw error;
     }
   }
 
@@ -586,11 +568,23 @@ function bookingService(bookingModel) {
         booking.tickets = ticketIds;
       }
 
+      /*
+      const productQrData = {
+        userId: populatedBooking.user._id,
+        products: populatedBooking.products,
+        // Calcular valor total dos produtos
+        totalAmount: populatedBooking.products.reduce(
+          (total, product) => total + product.price,
+          0
+        ), // Valor total dos produtos
+      };
+      */
+
       // Retorna a lista de QR Codes gerados
       return tickets;
     } catch (error) {
       console.error("Erro ao gerar bilhetes e QR Codes:", error);
-      throw new Error("Falha ao gerar bilhetes e QR Codes");
+      throw new DatabaseError("Falha ao gerar bilhetes e QR Codes");
     }
   }
 
@@ -610,14 +604,12 @@ function bookingService(bookingModel) {
     try {
       const booking = await bookingModel.findById(id);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking not found");
       }
       return booking;
     } catch (err) {
-      if (err.message === "Booking not found") {
-        throw err;
-      }
-      throw new Error("Error fetching booking");
+      console.log(err);
+      throw err;
     }
   }
 
@@ -625,13 +617,11 @@ function bookingService(bookingModel) {
     try {
       const booking = await bookingModel.findByIdAndUpdate(id);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking not found");
       }
     } catch (error) {
-      if (error.message === "Booking not found") {
-        throw error;
-      }
-      throw new Error("Error updating booking");
+      console.log(error);
+      throw error;
     }
   }
 
@@ -642,6 +632,10 @@ function bookingService(bookingModel) {
       const bookings = await bookingModel.find().skip(skip).limit(limit);
       const total = await bookingModel.countDocuments();
 
+      if (bookings.length === 0) {
+        throw new NotFoundError("No bookings found.")
+      }
+
       return {
         bookings,
         total,
@@ -649,7 +643,7 @@ function bookingService(bookingModel) {
         pages: Math.ceil(total / limit),
       };
     } catch (err) {
-      throw new Error("Error fetching bookings");
+      throw err;
     }
   }
 
@@ -659,7 +653,7 @@ function bookingService(bookingModel) {
       const session = await Session.findById(sessionId);
 
       if (!session) {
-        throw new Error("Session not found");
+        throw new NotFoundError("Session not found");
       }
 
       const skip = (page - 1) * limit;
@@ -668,9 +662,8 @@ function bookingService(bookingModel) {
         .find({ session: sessionId })
         .skip(skip)
         .limit(limit);
-      if (!booking) {
-        throw new Error("Booking not found");
-      }
+      
+      if (booking.length === 0) throw new NotFoundError("No bookings found.")
 
       return {
         booking,
@@ -679,7 +672,7 @@ function bookingService(bookingModel) {
         pages: Math.ceil(total / limit),
       };
     } catch (error) {
-      throw new Error("Error");
+      throw error;
     }
   }
 
@@ -688,14 +681,11 @@ function bookingService(bookingModel) {
     try {
       const booking = await bookingModel.findByIdAndDelete(id);
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking not found");
       }
-      return booking;
+      return "Booking eliminado";
     } catch (err) {
-      if (err.message === "Booking not found") {
-        throw err;
-      }
-      throw new Error("Error removing booking");
+      throw err;
     }
   }
 
@@ -706,13 +696,10 @@ function bookingService(bookingModel) {
         new: true,
       });
       if (!bookingUpdate) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking not found");
       }
     } catch (error) {
-      if (error.message === "Booking not found") {
-        throw error;
-      }
-      throw new Error("Error updating booking");
+      throw error;
     }
   }
 
@@ -726,7 +713,7 @@ function bookingService(bookingModel) {
         .populate("session");
 
       if (!booking) {
-        throw new Error("Booking not found");
+        throw new NotFoundError("Booking not found");
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(
@@ -735,28 +722,28 @@ function bookingService(bookingModel) {
       console.log("PaymentIntent:", paymentIntent);
 
       if (!paymentIntent) {
-        throw new Error("Payment Intent não encontrado");
+        throw new NotFoundError("Payment Intent não encontrado");
       }
 
       // Verificar se a reserva já foi cancelada
       if (booking.status === "cancelled") {
-        throw new Error("Booking is already cancelled");
+        throw new ValidationError("Booking is already cancelled");
       }
 
       if (booking.status === "completed") {
-        throw new Error("Booking completed");
+        throw new ValidationError("Booking completed");
       }
 
       if (booking.paymentStatus === "refunded") {
-        throw new Error("Booking refunded");
+        throw new ValidationError("Booking refunded");
       }
 
       if (booking.paymentStatus === "pending") {
-        throw new Error("Cannot refund when payment didnt go through");
+        throw new ValidationError("Cannot refund when payment didnt go through");
       }
 
       if (booking.paymentStatus === "cancelled") {
-        throw new Error("Unnable to refund");
+        throw new ValidationError("Unnable to refund");
       }
 
       const currentTime = Date.now();
@@ -788,7 +775,7 @@ function bookingService(bookingModel) {
           await refundPayment(booking.paymentIntentId, netAmount);
         } catch (error) {
           console.error("Erro ao reembolsar pagamento:", error);
-          throw new Error("Erro ao reembolsar pagamento");
+          throw error;
         }
       } else if (
         // Verificar se a reserva foi feita há menos de 2 horas e mais de 30 minutos
@@ -800,7 +787,7 @@ function bookingService(bookingModel) {
           await refundPayment(booking.paymentIntentId, netAmount / 2);
         } catch (error) {
           console.error("Erro ao reembolsar pagamento:", error);
-          throw new Error("Erro ao reembolsar pagamento");
+          throw error;
         }
         // Se o pedido de reembolso for feito após 30 minutos antes do início da sessão,
         // não é possível reembolsar o pagamento.
@@ -847,13 +834,13 @@ function bookingService(bookingModel) {
         }),
       ]);
 
-      if (!booking) throw new Error("Booking not found");
+      if (!booking) throw new NotFoundError("Booking not found");
       if (booking.paymentStatus !== "paid") {
-        throw new Error("Booking not eligible for partial refunds");
+        throw new ValidationError("Booking not eligible for partial refunds");
       }
 
       if (ticketsToRefund.length === 0) {
-        throw new Error("No tickets found for refund or already refunded");
+        throw new NotFoundError("No tickets found for refund or already refunded");
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(
@@ -925,7 +912,7 @@ function bookingService(bookingModel) {
       };
     } catch (error) {
       console.error("Error refunding tickets:", error);
-      throw new Error("Failed to refund tickets");
+      throw error;
     }
   }
 
@@ -960,7 +947,7 @@ function bookingService(bookingModel) {
       return { message: "PaymentIntent canceled" };
     } catch (error) {
       console.error("Error canceling PaymentIntent:", error);
-      throw new Error("Error canceling PaymentIntent");
+      throw new DatabaseError("Error canceling PaymentIntent");
     }
   }
 

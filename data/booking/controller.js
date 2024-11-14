@@ -20,11 +20,7 @@ async function createBooking(req, res) {
         const newBooking = await bookingService.create(booking, id);
         res.status(201).send(newBooking);
     } catch (error) {
-        if (error.message === "Check for missing fields or wrong fields") {
-            res.status(400).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next();
     }
 }
 
@@ -35,7 +31,7 @@ async function findAllBookings(req, res) {
     const result = await bookingService.findAll(page, limit);
     res.status(200).send(result);
   } catch (error) {
-    res.status(500).send({ error: "Error fetching bookings" });
+    next();
   }
 }
 
@@ -47,7 +43,7 @@ async function findAllBookingsForSession(req, res) {
         const result = await bookingService.findAllBookingsForSession(sessionId, page, limit);
         res.status(200).send(result);
     } catch (error) {
-        res.status(500).send({ error: "Error fetching bookings" });
+        next();
     }
 }
 
@@ -59,11 +55,7 @@ async function getBookingById(req, res) {
         const booking = await bookingService.findById(id);
         res.status(200).send(booking);
     } catch (error) {
-        if (error.message === "Booking not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+       next();
     }
 }
 
@@ -75,11 +67,7 @@ async function removeBookingById(req, res) {
         await bookingService.removeById(id);
         res.status(204).send();
     } catch (error) {
-        if (error.message === "Booking not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next();
     }
 }
 
@@ -92,11 +80,7 @@ async function updateBookingById(req, res) {
         res.status(200).send(updatedBooking);
     }
     catch (error) {
-        if (error.message === "Booking not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next();
     }
 }
 
@@ -106,6 +90,7 @@ async function handlePaymentConfirmation(paymentIntentId) {
         await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {
         console.error("Erro ao confirmar pagamento:", error.message);
+        next();
     }
 }
 
@@ -117,11 +102,7 @@ async function cancelReservation(req, res) {
         await bookingService.cancelReservation(id);
         res.status(204).send();
     } catch (error) {
-        if (error.message === "Booking not found") {
-            res.status(404).json({ error: error.message });
-        } else {
-            res.status(500).json({ error: "Internal Server Error" });
-        }
+        next();
     }
 }
 
@@ -133,17 +114,7 @@ async function refundTicketsFromBooking(req, res) {
     res.status(200).send();
   } catch (error) {
     console.log(error);
-  }
-}
-
-async function findRefunds(req, res) {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const result = await bookingService.findRefunds(page, limit);
-    res.status(200).send(result);
-  } catch (error) {
-    res.status(500).send({ error: "Error fetching refunds" });
+    next();
   }
 }
 

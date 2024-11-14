@@ -17,13 +17,10 @@ function CinemaRouter() {
 
   router.put("/:id/removeMovie/:movieId", cinemaController.removeMovieFromCinema);
   router.put("/removeMovies", cinemaController.removeMovieFromBillboards);
-  router.post(
-    "/:id/addMoviesToBillboard",
-    cinemaController.addMoviesToBillboard
-  );
   //router.put("/removeMovies", cinemaController.removeMovieFromBillboards);
   router.put("/:id/update", cinemaController.updateCinemaById);
 
+  router.post("/:id/addMoviesToBillboard", cinemaController.addMoviesToBillboard);
   router.post("/:id/addMoviesToBillboard", cinemaController.addMoviesToBillboard);
   router.post("/create", cinemaController.createCinema);
   router.post("/addMoviesToAllBillboards", cinemaController.addMoviesToBillboards);
