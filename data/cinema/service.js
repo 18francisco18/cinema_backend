@@ -32,10 +32,6 @@ function cinemaService(cinemaModel) {
     try {
       let newCinema = new cinemaModel(cinema);
 
-      if (!newCinema.name || !newCinema.address || !newCinema.city || !newCinema.state || !newCinema.zipCode || !newCinema.rooms) {
-        throw new ValidationError("Missing fields");
-      }
-
       return await save(newCinema);
     } catch (error) {
       console.log(error);
