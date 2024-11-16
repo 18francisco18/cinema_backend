@@ -12,7 +12,6 @@ const ticketSchema = new Schema({
     enum: ["booked", "used", "cancelled", "refunded"],
     default: "booked",
   },
-  qrCode: { type: String },
   issuedAt: { type: Date, default: Date.now },
 });
 

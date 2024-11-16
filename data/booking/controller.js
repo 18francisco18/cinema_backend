@@ -85,7 +85,7 @@ async function updateBookingById(req, res, next) {
 }
 
 
-async function handlePaymentConfirmation(paymentIntentId) {
+async function handlePaymentConfirmation(paymentIntentId, next) {
     try {
         await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {

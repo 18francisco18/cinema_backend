@@ -8,7 +8,7 @@ function TicketsRouter() {
   router.use(bodyParser.json({ limit: "100mb" }));
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
-  router.post("/verify-ticket", ticketsController.verifyTicketQRCode);
+  router.post("/verify-qrcode", ticketsController.verifyTicketQRCode);
 
   return router;
 }

@@ -6,14 +6,12 @@ const ticketsController = {
 
 async function verifyTicketQRCode(req, res, next) {
     try {
-        const { reservationId } = req.body;
-
-        const ticket = await ticketService.verifyQRCode(reservationId);
-
-        res.status(200).json({ ticket });
+        const qrCodeData = req.body;
+        const validationResult = await ticketService.validateQRCode(qrCodeData);
+        res.status(200).json({ validationResult });
     } catch (error) {
         console.error(error.message);
-        res.status(500).json({ error: 'Error verifying ticket' });
+        next(error);
     }
 }
 

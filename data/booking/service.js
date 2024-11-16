@@ -10,6 +10,9 @@ const nodeMailer = require("nodemailer");
 const dotenv = require("dotenv");
 const Session = require("../sessions/sessions");
 const Product = require("../products/product");
+const QRCodeSchema = require("./qrcode");
+const jwt = require("jsonwebtoken");
+const { v4: uuidv4 } = require("uuid");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const {
   ValidationError,
@@ -232,33 +235,22 @@ function bookingService(bookingModel) {
         );
 
         // Gerar o QR Code usando a função existente
-        const tickets = await generateQRCode(booking);
-
-        // Gerar a lista de QR codes e assentos para incluir no e-mail
-        const qrCodeImages = tickets
-          .map((ticket) => {
-            return `
-          <p><strong>Seat:</strong> ${ticket.ticket.seat}</p>
-          <img src="${ticket.qrCode}" alt="QR Code for seat ${ticket.ticket.seat}" />
-        `;
-          })
-          .join("");
+        const qrCode = await generateQRCode(booking);
 
         // Configurar as opções de e-mail para enviar o QR Code
         const mailOptions = {
           from: process.env.EMAIL_ADDRESS,
           to: booking.user.email,
           subject: "Your Movie Booking - QR Codes",
-          text: `Your booking is confirmed for ${booking.seats.length} seat(s). Please find your QR Codes attached.`,
+          text: `Your booking is confirmed for ${booking.seats.length} seat(s). Please find your QR Code attached.`,
           html: `
           <p>Dear ${booking.user.name},</p>
           <p>Thank you for booking your tickets! Here are the details:</p>
           <ul>
-            <li><strong>Booking ID:</strong> ${booking._id}</li>
             <li><strong>Seats:</strong> ${booking.seats.join(", ")}</li>
           </ul>
-          <p>Please use the QR codes below for entry:</p>
-          ${qrCodeImages}
+          <p>Please use the QR code below for entry:</p>
+          <img src="${qrCode}" alt="QR Code" />
           <p>Enjoy your movie!</p>
         `,
         };
@@ -282,8 +274,6 @@ function bookingService(bookingModel) {
 
         // Criar um relatório de pagamento interno
         await financialReportController.createInternalPaymentReport(report);
-
-        //generateInvoice(booking);
 
         return { message: "Payment confirmed, QR Code sent", booking };
       } else {
@@ -330,7 +320,6 @@ function bookingService(bookingModel) {
         );
         const quantity = matchingProducts.length;
 
-
         if (quantity > 0) {
           console.log(matchingProducts);
           console.log(product.discountedPrice);
@@ -347,8 +336,6 @@ function bookingService(bookingModel) {
             : product.price;
           console.log(`Is Discount Valid: ${isDiscountValid}`);
           console.log(`Price to charge: ${priceToCharge}`); // Adicione um log para verificar o preço
-
-          
 
           // Adicionar o produto ao line_items com a quantidade correta
           line_items.push({
@@ -415,78 +402,6 @@ function bookingService(bookingModel) {
     }
   }
 
-  /*
-  // Função para remover referências circulares de um objeto
-  function removeCircularReferences(obj) {
-    const seen = new WeakSet();
-    return JSON.parse(
-      JSON.stringify(obj, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-          if (seen.has(value)) {
-            return;
-          }
-          seen.add(value);
-        }
-        return value;
-      })
-    );
-  }
-
-  // Função para gerar um invoice a partir de uma reserva
-  async function generateInvoice(booking) {
-    try {
-      // Buscar a reserva populada para obter os dados necessários
-      const populatedBooking = await bookingModel.findById(booking._id).populate({ 
-          path: "session", 
-          populate: [
-              { path: "movie", select: "title" },
-              { path: "room", select: "name", populate: { path: "cinema", select: "name" } }
-          ] 
-      });
-
-      // Extrair os dados necessários de `populatedBooking`
-      const movieTitle = populatedBooking.session.movie.title;
-      const cinemaName = populatedBooking.session.room.cinema.name;
-      const seats = populatedBooking.seats.join(", ");
-      const startTime = populatedBooking.session.startTime;
-      const totalAmount = populatedBooking.totalAmount * 100; // Em centavos
-
-      // 1. Criar um invoiceItem para o valor da reserva
-      await stripe.invoiceItems.create({
-          customer: booking.user, // ID do cliente no Stripe
-          amount: totalAmount, // Valor total em centavos
-          currency: "eur",
-          description: `Movie Ticket for ${movieTitle} - Seats: ${seats} - StartTime: ${startTime}`,
-      });
-
-      // 2. Criar a invoice para o cliente, associando o invoiceItem criado
-      const invoice = await stripe.invoices.create({
-          customer: booking.user, // ID do cliente no Stripe
-          auto_advance: true, // Avançar automaticamente para cobrança
-          collection_method: "charge_automatically", // Método de cobrança automática
-          payment_settings: { payment_method_types: ["card"] }, // Tipos de pagamento aceitos
-          customer_email: booking.user.email, // E-mail do cliente
-          description: `Invoice for Movie Ticket - ${movieTitle}`, // Descrição da fatura
-          custom_fields: [ // Campos personalizados
-              { name: "Movie", value: String(movieTitle) },
-              { name: "Cinema", value: String(cinemaName) },
-          ],
-      });
-
-      console.log("Dados do Invoice:", invoice);
-
-      // Remover referências circulares do invoice
-      const cleanedInvoice = removeCircularReferences(invoice);
-
-      // Retornar o invoice gerado
-      return cleanedInvoice;
-    } catch (error) {
-        console.error("Erro ao gerar invoice:", error);
-        throw new Error("Falha ao gerar invoice");
-    }
-  }
-  */
-
   // Função para gerar um QR Code a partir de uma reserva
   async function generateQRCode(booking) {
     try {
@@ -503,11 +418,11 @@ function bookingService(bookingModel) {
               populate: { path: "cinema", select: "name" },
             },
           ],
-        });
+        })
+        .populate("products");
 
       // Lista para armazenar os bilhetes gerados
       const tickets = [];
-      const ticketIds = [];
 
       // Para cada assento reservado, criar um bilhete separado
       for (const seat of populatedBooking.seats) {
@@ -516,72 +431,61 @@ function bookingService(bookingModel) {
           seat: seat, // Assento associado ao bilhete
         });
 
-        // Popula o ticket criado com a reserva completa para associar todos os dados
-        const populatedTicket = await ticketModel
-          .findById(newTicket._id)
-          .populate({
-            path: "booking",
-            populate: [
-              {
-                path: "session",
-                populate: [
-                  { path: "movie", select: "title" },
-                  {
-                    path: "room",
-                    select: "name",
-                    populate: { path: "cinema", select: "name" },
-                  },
-                ],
-                path: "products",
-              },
-            ],
-          });
-
-        // Dados que serão codificados no QR Code para cada bilhete
-        const qrData = {
-          ticketId: populatedTicket._id, // ID do bilhete único
-          reservationNumber: populatedTicket.ticketNumber, // Número do bilhete
-          userId: populatedBooking.user._id, // ID do usuário
-          sessionId: populatedBooking.session._id, // ID da sessão
-          movie: populatedBooking.session.movie.title, // Filme da sessão
-          room: populatedBooking.session.room.name, // Nome da sala
-          cinema: populatedBooking.session.room.cinema.name, // Nome do cinema
-          seat: populatedTicket.seat, // Assento do bilhete
-          products: [populatedBooking.products], // Produtos adicionais
-          startTime: populatedBooking.session.startTime, // Hora de início da sessão
-          totalAmount: populatedBooking.session.price, // Valor de cada bilhete
-          printedTime: populatedTicket.issuedAt, // Hora de emissão do bilhete
-        };
-
-        console.log("Dados do QR Code:", qrData);
-
-        // Gera o QR Code como uma string base64
-        const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
-
-        // Adiciona o bilhete com o QR Code gerado na lista de tickets
-        tickets.push({
-          ticket: populatedTicket,
-          qrCode: qrCode,
-        });
-
-        ticketIds.push(populatedTicket._id);
-        booking.tickets = ticketIds;
+        console.log("Ticket created:", newTicket);
+        tickets.push(newTicket._id);
       }
 
-      /*
-      const productQrData = {
-        userId: populatedBooking.user._id,
-        products: populatedBooking.products,
-        // Calcular valor total dos produtos
-        totalAmount: populatedBooking.products.reduce(
-          (total, product) => total + product.price,
-          0
-        ), // Valor total dos produtos
+      const qrCodeId = uuidv4(); // ID único para o QR Code
+
+      // Dados que serão codificados no QR Code para cada bilhete
+      const qrData = {
+        qrCodeId,
+        bookingId: populatedBooking._id, // ID da reserva associada
+        tickets: tickets.map((ticket) => ({ ticketId: ticket._id })), // Lista de IDs de bilhetes
+        products: populatedBooking.products.map((product) => ({
+          productId: product._id,
+        })),
+        expirationDate: populatedBooking.session.endTime, // Data de validade do QR Code
       };
-      */
+
+      // Calcular a diferença entre a data de expiração e a data atual em segundos
+      const expiresIn = Math.floor(
+        (new Date(qrData.expirationDate) - new Date()) / 1000
+      );
+
+      console.log("expiresIn", expiresIn);
+
+      console.log("Dados do QR Code:", qrData);
+
+      const token = jwt.sign(
+        {
+          qrData,
+        },
+        process.env.SECRET_KEY, // Chave secreta
+        { expiresIn } // Tempo de validade do token
+      );
+
+      // Adicionar o token ao esquema de QR Code
+      const qrCodeEntry = new QRCodeSchema({
+        ...qrData,
+        signature: token,
+      });
+
+      console.log("QR Code entry:", qrCodeEntry);
+
+      await qrCodeEntry.save(); // Salvar o QR Code no banco de dados
+
+      // Gera o QR Code como uma string base64
+      const qrCode = await QRCode.toDataURL(
+        JSON.stringify({ qrCodeId, token })
+      );
+
+
+      populatedBooking.tickets = tickets;
+      await populatedBooking.save();
 
       // Retorna a lista de QR Codes gerados
-      return tickets;
+      return qrCode;
     } catch (error) {
       console.error("Erro ao gerar bilhetes e QR Codes:", error);
       throw new DatabaseError("Falha ao gerar bilhetes e QR Codes");
@@ -633,7 +537,7 @@ function bookingService(bookingModel) {
       const total = await bookingModel.countDocuments();
 
       if (bookings.length === 0) {
-        throw new NotFoundError("No bookings found.")
+        throw new NotFoundError("No bookings found.");
       }
 
       return {
@@ -662,8 +566,8 @@ function bookingService(bookingModel) {
         .find({ session: sessionId })
         .skip(skip)
         .limit(limit);
-      
-      if (booking.length === 0) throw new NotFoundError("No bookings found.")
+
+      if (booking.length === 0) throw new NotFoundError("No bookings found.");
 
       return {
         booking,
@@ -739,7 +643,9 @@ function bookingService(bookingModel) {
       }
 
       if (booking.paymentStatus === "pending") {
-        throw new ValidationError("Cannot refund when payment didnt go through");
+        throw new ValidationError(
+          "Cannot refund when payment didnt go through"
+        );
       }
 
       if (booking.paymentStatus === "cancelled") {
@@ -840,7 +746,9 @@ function bookingService(bookingModel) {
       }
 
       if (ticketsToRefund.length === 0) {
-        throw new NotFoundError("No tickets found for refund or already refunded");
+        throw new NotFoundError(
+          "No tickets found for refund or already refunded"
+        );
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(
@@ -924,12 +832,11 @@ function bookingService(bookingModel) {
         amount: amount, // Valor a ser reembolsado (em centavos)
       });
 
-      /*const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      const booking = await bookingModel.findById(paymentIntent.metadata.bookingId).populate("user");
-      await userModel.findByIdAndUpdate(booking.user._id, {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      await userModel.findByIdAndUpdate(paymentIntent.metadata.userId, {
         $inc: { points: -paymentIntent.amount }, // Decrementar pontos do utilizador
 
-      }) */
+      }) 
 
       console.log("Reembolso criado:", refund);
       return refund;

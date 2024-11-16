@@ -1,5 +1,8 @@
 const ticketModel = require('./tickets');
-const booking = require('../booking');
+const Booking = require('../booking/booking');
+const QRCodeModel = require('../booking/qrcode');
+const jwt = require('jsonwebtoken');
+const User = require('../users/user');
 const {
   ValidationError,
   AuthenticationError,
@@ -16,7 +19,7 @@ function TicketService(ticketModel) {
         findById,
         findAll,
         removeById,
-        verifyQRCode,
+        validateQRCode,
     };
 
     async function create(ticket) {
@@ -63,33 +66,44 @@ function TicketService(ticketModel) {
         }
     }
 
-    // Função para verificar o QR Code (POR FAZER)
-    // ESTE CODIGO ESTÁ EXTREMAMENTE DESATUALIZADO!
-    async function verifyQRCode(reservationId) {
-        try {
-            const ticket = await ticketModel.findById(reservationId);
+    async function validateQRCode(qrCodeData) {
+      try {
+        const { qrCodeId, token } = qrCodeData;
+        console.log("Validando QR Code:", qrCodeId, token);
 
-            if (!ticket) {
-                return res.status(404).json({ message: 'Ticket not found' });
-            }
+        if (!qrCodeId || !token) throw new ValidationError("Dados inválidos");
 
-            if (ticket.status === 'used') {
-                return res.status(400).json({ message: 'Ticket has already been used' });
-            }
+        // Buscar QR Code no banco de dados
+        const qrCode = await QRCodeModel.findOne({ qrCodeId });
+        if (!qrCode) throw new ValidationError("QR Code inválido");
+        if (qrCode.isRevoked) throw new ValidationError("QR Code revogado");
+        if (qrCode.expirationDate < new Date()) throw new ValidationError("QR Code expirado");
+        if (qrCode.remainingUses === 0) throw new ValidationError("QR Code já utilizado");
+        
+        const booking = await Booking.findById(qrCode.bookingId);
+        if (!booking) throw new NotFoundError("Booking not found");
+    
 
-            if (ticket.status === 'cancelled') {
-                return res.status(400).json({ message: 'Ticket has been cancelled' });
-            }
+        // Decodificar o token e verificar consistência
+        const decoded = jwt.verify(token, process.env.SECRET_KEY);
+        console.log("Token decodificado:", decoded);
+        console.log("QR Code:", qrCode);
+        if (decoded.qrData.qrCodeId !== qrCode.qrCodeId)
+          throw new ValidationError("Token inconsistente");
+        
+        const user = await User.findById(booking.user);
+        if (!user) throw new NotFoundError("User not found");
 
-            // Marcar o bilhete como usado
-            ticket.status === "used";
-            await ticket.save();
+        // Incrementar número de usos
+        qrCode.remainingUses -= 1;
+        await qrCode.save();
 
-            return res.status(200).json({ message: 'Ticket verified successfully' });
-        } catch (error) {
-            console.log(error);
-            return res.status(500).json({ message: 'Internal server error', error });
-        }
+        console.log("QR Code validado com sucesso");
+        return { success: true, qrCode };
+      } catch (error) {
+        console.error("Erro ao validar QR Code:", error.message);
+        throw error;
+      }
     }
 
     
