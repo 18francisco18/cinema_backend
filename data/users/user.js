@@ -22,6 +22,12 @@ let userSchema = new Schema({
   passwordResetExpires: { type: Date, select: false },
   role: { type: RoleSchema },
   points: { type: Number, default: 0, required: false },
+  redeemedMerchandise: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Merchandise",
+    },
+  ], 
 });
 
 let User = mongoose.model("User", userSchema);
