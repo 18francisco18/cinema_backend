@@ -3,6 +3,7 @@ const http = require("http");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
 const CORS = require("cors");
+const cookieParser = require('cookie-parser');
 const sessionService = require("./data/sessions");
 const discountService = require("./data/discounts");
 const apiVersion = process.env.API_VERSION;
@@ -27,6 +28,7 @@ app.use(CORS({
   exposedHeaders: ['Set-Cookie'],
   credentials: true
 }));
+app.use(cookieParser());
 app.use(express.json()); 
 app.use(router.init(`/api/${apiVersion}`));
 

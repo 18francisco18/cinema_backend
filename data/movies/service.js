@@ -19,6 +19,10 @@ function MovieService(movieModel) {
     findAll,
     removeById,
     searchMovie,
+    addComment,
+    getMovieComments,
+    updateComment,
+    deleteComment,
   };
 
   async function create(movie) {
@@ -183,6 +187,85 @@ function MovieService(movieModel) {
     } catch (error) {
       console.log(error);
       throw error;
+    }
+  }
+
+  async function addComment(movieId, commentData) {
+    try {
+      const movie = await movieModel.findById(movieId);
+      if (!movie) {
+        throw new NotFoundError("Filme não encontrado");
+      }
+
+      movie.comments.push(commentData);
+      await movie.save();
+      return movie.comments[movie.comments.length - 1];
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError("Erro ao adicionar comentário");
+    }
+  }
+
+  async function getMovieComments(movieId) {
+    try {
+      const movie = await movieModel.findById(movieId);
+      if (!movie) {
+        throw new NotFoundError("Filme não encontrado");
+      }
+      return movie.comments;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError("Erro ao buscar comentários");
+    }
+  }
+
+  async function updateComment(movieId, commentId, updateData) {
+    try {
+      const movie = await movieModel.findById(movieId);
+      if (!movie) {
+        throw new NotFoundError("Filme não encontrado");
+      }
+
+      const comment = movie.comments.id(commentId);
+      if (!comment) {
+        throw new NotFoundError("Comentário não encontrado");
+      }
+
+      Object.assign(comment, updateData);
+      await movie.save();
+      return comment;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError("Erro ao atualizar comentário");
+    }
+  }
+
+  async function deleteComment(movieId, commentId) {
+    try {
+      const movie = await movieModel.findById(movieId);
+      if (!movie) {
+        throw new NotFoundError("Filme não encontrado");
+      }
+
+      const comment = movie.comments.id(commentId);
+      if (!comment) {
+        throw new NotFoundError("Comentário não encontrado");
+      }
+
+      comment.remove();
+      await movie.save();
+      return true;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError("Erro ao deletar comentário");
     }
   }
 
