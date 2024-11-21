@@ -10,6 +10,7 @@ const {
   DatabaseError,
   ServiceUnavailableError,
 } = require("../../AppError");
+const QRCode = require('qrcode');
 
 function UserService(UserModel) {
   let service = {
@@ -23,6 +24,8 @@ function UserService(UserModel) {
     comparePassword, //feito
     verifyToken, //feito
     createToken, //feito
+    generateLoginQRCode, // novo
+    verifyQRCodeData, // novo
   };
 
   async function create(user) {
@@ -157,6 +160,47 @@ function UserService(UserModel) {
 
   function comparePassword(password, hash) {
     return bcrypt.compare(password, hash);
+  }
+
+  async function generateLoginQRCode(email, password) {
+    try {
+      // Create a JSON object with login credentials
+      const loginData = {
+        email,
+        password,
+        timestamp: Date.now() // Add timestamp for security
+      };
+
+      // Convert the data to a JSON string
+      const dataString = JSON.stringify(loginData);
+
+      // Generate QR code as data URL
+      const qrCodeDataURL = await QRCode.toDataURL(dataString);
+      return qrCodeDataURL;
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      throw error;
+    }
+  }
+
+  async function verifyQRCodeData(qrData) {
+    try {
+      // Parse the QR code data
+      const loginData = JSON.parse(qrData);
+      
+      // Check if the QR code is not too old (e.g., 5 minutes)
+      const timestampAge = Date.now() - loginData.timestamp;
+      if (timestampAge > 5 * 60 * 1000) { // 5 minutes in milliseconds
+        throw new Error('QR code has expired');
+      }
+
+      // Try to login with the credentials
+      const user = await findUser(UserModel, loginData);
+      return user;
+    } catch (error) {
+      console.error('Error verifying QR code:', error);
+      throw error;
+    }
   }
 
   return service;

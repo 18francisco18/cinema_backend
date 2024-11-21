@@ -6,6 +6,7 @@ const User = require("../../data/users/user");
 const VerifyToken = require("../../middleware/token");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
+const userService = require("../../services/userService"); // Assuming userService is defined in this file
 
 const AuthRouter = () => {
   let router = express();
@@ -212,6 +213,36 @@ const AuthRouter = () => {
         res.status(500).send({ error: "An error occurred" });
       }
     });
+
+  // Generate QR Code for login
+  router.post("/generate-qr", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const qrCode = await userService.generateLoginQRCode(email, password);
+      res.json({ qrCode });
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+      res.status(500).json({ error: "Failed to generate QR code" });
+    }
+  });
+
+  // Login with QR Code
+  router.post("/login-qr", async (req, res) => {
+    try {
+      const { qrData } = req.body;
+      const user = await userService.verifyQRCodeData(qrData);
+      
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const token = await userService.createToken(user);
+      res.json({ token, user });
+    } catch (error) {
+      console.error("Error logging in with QR code:", error);
+      res.status(500).json({ error: "Failed to login with QR code" });
+    }
+  });
 
   router.use(VerifyToken);
 
