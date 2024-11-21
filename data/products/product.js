@@ -9,7 +9,8 @@ const productSchema = new Schema({
     stripePriceId: { type: String, required: true },
     category: { type: Schema.Types.ObjectId, ref: "Category", required: true },
     image: { type: String, required: true },
-    stock: { type: Boolean, required: true }
+    stock: { type: Boolean, required: true },
+    pointsRef: { type: Schema.Types.ObjectId, ref: "Points" },
 });
 
 // Garantir que os índices sejam criados ao iniciar o sistema

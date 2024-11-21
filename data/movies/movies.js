@@ -6,6 +6,12 @@ const ratingSchema = new Schema({
   value: { type: String, required: true },
 });
 
+const commentsSchema = new Schema({
+  user : { type: Schema.Types.ObjectId, ref: 'User' },
+  comment : { type: String, required: true },
+  createdAt : { type: Date, default: Date.now },
+});
+
 const movieSchema = new Schema({
     title: { type: String, required: true },
     year: { type: String, required: true },
@@ -32,6 +38,7 @@ const movieSchema = new Schema({
     production: { type: String, required: true },
     website: { type: String, required: true },
     response: { type: String, required: true },
+    comments: [commentsSchema],
 });
 
 const Movie = mongoose.model("Movie", movieSchema);
