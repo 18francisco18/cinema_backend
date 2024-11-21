@@ -1,15 +1,16 @@
+const express = require("express");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
-const express = require("express");
 const Users = require("../../data/users");
 const User = require("../../data/users/user");
 const VerifyToken = require("../../middleware/token");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
-const userService = require("../../services/userService"); // Assuming userService is defined in this file
+const UserService = require("../../data/users/service");
 
 const AuthRouter = () => {
   let router = express();
+  const userService = UserService(User);
 
   router.use(cookieParser());
   router.use(bodyParser.json({ limit: "100mb" }));
