@@ -20,10 +20,20 @@ const AuthRouter = () => {
     .post(function (req, res, next) {
       const body = req.body;
       console.log("User:", body);
+      // Add default user role to the request body
+      body.role = { name: 'User', scope: ['user'] };
+
       Users.create(body)
         .then(() => Users.createToken(body))
         .then((response) => {
           console.log("User token:", response);
+          res.cookie("token", response.token, {
+            httpOnly: true,
+            sameSite: "none",
+            secure: true,
+            path: "/",
+            domain: "localhost"
+          });
           res.status(200).send(response);
         })
         .catch((err) => {
@@ -47,9 +57,10 @@ const AuthRouter = () => {
           console.log("Login token:", login.token);
           res.cookie("token", login.token, {
             httpOnly: true,
-            sameSite: "None",
+            sameSite: "none",
             secure: true,
-            domain: "localhost:3000",
+            path: "/",
+            domain: "localhost"
           });
           res.status(200);
           res.send({
@@ -65,17 +76,32 @@ const AuthRouter = () => {
         });
     });
 
-  //  router.route("/me").get(VerifyToken, function (req, res, next) {
-  //    const token = req.cookies.token || req.headers["authorization"];
-  //    jwt.verify(token, config.secret, function (err, decoded) {
-  //      if (err) {
-  //        return res
-  //          .status(500)
-  //          .send({ auth: false, message: "Failed to authenticate token." });
-  //      }
-  //      res.status(200).send(decoded);
-  //    });
-  //  });
+  router
+    .route("/logout")
+    .post(function (req, res) {
+      res.clearCookie("token", {
+        httpOnly: true,
+        sameSite: "none",
+        secure: true,
+        path: "/",
+        domain: "localhost"
+      });
+      res.status(200).send({ message: "Logged out successfully" });
+    });
+
+  router
+    .route("/me")
+    .get(VerifyToken, function (req, res) {
+      const token = req.cookies.token || req.headers["authorization"];
+      jwt.verify(token, config.secret, function (err, decoded) {
+        if (err) {
+          return res
+            .status(500)
+            .send({ auth: false, message: "Failed to authenticate token." });
+        }
+        res.status(200).send(decoded);
+      });
+    });
 
   router
     .route("/user/:id")
