@@ -18,11 +18,9 @@ const AuthRouter = () => {
 
   router
     .route("/register")
-    // Create a user (FUNCIONA)
     .post(function (req, res, next) {
       const body = req.body;
       console.log("User:", body);
-      // Add default user role to the request body
       body.role = { name: 'User', scope: ['user'] };
 
       Users.create(body)
@@ -31,10 +29,10 @@ const AuthRouter = () => {
           console.log("User token:", response);
           res.cookie("token", response.token, {
             httpOnly: true,
-            sameSite: "none",
-            secure: true,
-            path: "/",
-            domain: "localhost"
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
           });
           res.status(200).send(response);
         })
@@ -47,7 +45,6 @@ const AuthRouter = () => {
 
   router
     .route("/login")
-    // (FUNCIONA)
     .post(function (req, res, next) {
       let body = req.body;
       console.log("Login for user:", body);
@@ -59,21 +56,29 @@ const AuthRouter = () => {
           console.log("Login token:", login.token);
           res.cookie("token", login.token, {
             httpOnly: true,
-            sameSite: "none",
-            secure: true,
-            path: "/",
-            domain: "localhost"
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
           });
-          res.status(200);
-          res.send({
+          console.log('Cookie definido:', {
+            token: login.token,
+            options: {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+              maxAge: 24 * 60 * 60 * 1000
+            }
+          });
+          res.status(200).send({
             token: login.token,
             userId: login.userId,
           });
         })
         .catch((err) => {
           console.log(err);
-          res.status(500);
-          res.send(err);
+          res.status(500).send(err);
           next();
         });
     });
@@ -83,10 +88,9 @@ const AuthRouter = () => {
     .post(function (req, res) {
       res.clearCookie("token", {
         httpOnly: true,
-        sameSite: "none",
-        secure: true,
-        path: "/",
-        domain: "localhost"
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
       });
       res.status(200).send({ message: "Logged out successfully" });
     });
@@ -107,7 +111,6 @@ const AuthRouter = () => {
 
   router
     .route("/user/:id")
-    // (FUNCIONA)
     .get(VerifyToken, function (req, res, next) {
       const userId = req.params.id;
       if (!userId) {
@@ -125,7 +128,6 @@ const AuthRouter = () => {
           res.status(500).send({ error: "An error occurred" });
         });
     })
-    // DELETE user by ID
     .delete(VerifyToken, function (req, res, next) {
       const userId = req.params.id;
       if (!userId) {
@@ -148,7 +150,6 @@ const AuthRouter = () => {
 
   router
     .route("/users")
-    // GET - All users
     .get(VerifyToken, function (req, res, next) {
       User.find({})
         .then((users) => {
@@ -167,7 +168,6 @@ const AuthRouter = () => {
 
   router
     .route("/user/email/:email")
-    // GET - Buscar usuário por email
     .get(VerifyToken, function (req, res, next) {
       const userEmail = req.params.email;
       if (!userEmail) {
@@ -188,7 +188,6 @@ const AuthRouter = () => {
     });
 
   router
-  // PUT - Atualizar usuário por email
     .route("/user/update/:email")
     .put(VerifyToken, async function (req, res, next) {
       const userEmail = req.params.email;
@@ -215,7 +214,6 @@ const AuthRouter = () => {
       }
     });
 
-  // Generate QR Code for login
   router.post("/generate-qr", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -227,7 +225,6 @@ const AuthRouter = () => {
     }
   });
 
-  // Login with QR Code
   router.post("/login-qr", async (req, res) => {
     try {
       const { qrData } = req.body;

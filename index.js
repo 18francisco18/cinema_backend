@@ -21,15 +21,21 @@ mongoose
 
 let router = require(`./server/${apiVersion}/router`);
 var app = express();
+
+// Configuração do CORS
 app.use(CORS({
   origin: 'http://localhost:4000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['Set-Cookie'],
   credentials: true
 }));
+
+// Middleware para cookies e JSON
 app.use(cookieParser());
 app.use(express.json()); 
+
+// Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos
