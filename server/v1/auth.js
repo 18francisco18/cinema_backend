@@ -97,16 +97,37 @@ const AuthRouter = () => {
 
   router
     .route("/me")
-    .get(VerifyToken, function (req, res) {
-      const token = req.cookies.token || req.headers["authorization"];
-      jwt.verify(token, config.secret, function (err, decoded) {
-        if (err) {
-          return res
-            .status(500)
-            .send({ auth: false, message: "Failed to authenticate token." });
+    .get(VerifyToken, async function (req, res) {
+      try {
+        const token = req.cookies.token || req.headers["authorization"];
+        const decoded = await new Promise((resolve, reject) => {
+          jwt.verify(token, config.secret, function (err, decoded) {
+            if (err) reject(err);
+            resolve(decoded);
+          });
+        });
+
+        // Fetch complete user data from database
+        const user = await User.findById(decoded.id);
+        if (!user) {
+          return res.status(404).send({ auth: false, message: "User not found." });
         }
-        res.status(200).send(decoded);
-      });
+
+        // Return user data without sensitive information
+        const userData = {
+          _id: user._id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          role: user.role
+        };
+
+        res.status(200).send(userData);
+      } catch (err) {
+        return res
+          .status(500)
+          .send({ auth: false, message: "Failed to authenticate token." });
+      }
     });
 
   router
@@ -127,6 +148,49 @@ const AuthRouter = () => {
           console.error(err);
           res.status(500).send({ error: "An error occurred" });
         });
+    })
+    .put(VerifyToken, async function (req, res, next) {
+      try {
+        const userId = req.params.id;
+        const { name, username } = req.body;
+
+        // Verify if the authenticated user is updating their own profile
+        if (userId !== req.userId) {
+          return res.status(403).send({ error: "Not authorized to update this user's profile" });
+        }
+
+        // Check for duplicate username if username is being updated
+        if (username) {
+          const existingUser = await User.findOne({ username, _id: { $ne: userId } });
+          if (existingUser) {
+            return res.status(400).send({ error: "Username already exists" });
+          }
+        }
+
+        // Only allow updating name and username
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (username) updateData.username = username;
+
+        const updatedUser = await Users.updateUser(userId, updateData);
+        
+        res.status(200).send({
+          message: "User profile updated successfully",
+          user: {
+            _id: updatedUser._id,
+            name: updatedUser.name,
+            username: updatedUser.username,
+            email: updatedUser.email,
+            role: updatedUser.role
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        if (err.name === 'NotFoundError') {
+          return res.status(404).send({ error: err.message });
+        }
+        res.status(500).send({ error: "An error occurred while updating the user" });
+      }
     })
     .delete(VerifyToken, function (req, res, next) {
       const userId = req.params.id;
