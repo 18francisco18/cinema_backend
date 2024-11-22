@@ -1,0 +1,68 @@
+# Rotas de Gestão de Utilizadores
+
+## Autenticação
+
+### POST /register
+Regista um novo utilizador
+- Body: { email, password, name, username }
+- Returns: { token, userId }
+- Cookie: token (24h)
+
+### POST /login
+Autentica um utilizador
+- Body: { email, password }
+- Returns: { token, userId }
+- Cookie: token (24h)
+
+### POST /logout
+Termina a sessão do utilizador
+- Returns: { message: "Logged out successfully" }
+- Limpa o cookie do token
+
+### GET /me
+Obtém informações do utilizador autenticado
+- Header: Authorization (token)
+- Returns: Dados do utilizador decodificados do token
+
+## Gestão de Utilizadores
+
+### GET /user/:id
+Obtém detalhes de um utilizador específico por ID
+- Requer autenticação
+- Params: id (ID do utilizador)
+- Returns: Dados do utilizador
+
+### DELETE /user/:id
+Remove um utilizador específico
+- Requer autenticação
+- Params: id (ID do utilizador)
+- Returns: { message: "User successfully deleted" }
+
+### GET /users
+Lista todos os utilizadores
+- Requer autenticação
+- Returns: Array de utilizadores
+
+### GET /user/email/:email
+Procura um utilizador por email
+- Requer autenticação
+- Params: email
+- Returns: Dados do utilizador
+
+### PUT /user/update/:email
+Atualiza dados de um utilizador
+- Requer autenticação
+- Params: email
+- Body: { name?, username? }
+- Returns: Dados do utilizador atualizados
+
+## Notas de Segurança
+
+- Todas as rotas (exceto /register e /login) requerem autenticação via token
+- O token é armazenado em cookie httpOnly por segurança
+- O token expira em 24 horas
+- Cookies configurados com:
+  - httpOnly: true
+  - secure: true (em produção)
+  - sameSite: 'lax'
+  - path: '/'

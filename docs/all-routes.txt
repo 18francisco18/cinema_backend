@@ -1,0 +1,116 @@
+# Documentação das Rotas do Sistema
+
+## 1. Autenticação e Utilizadores (/auth)
+
+### Autenticação
+- POST /register - Regista novo utilizador
+- POST /login - Autentica utilizador
+- POST /logout - Termina sessão
+- GET /me - Obtém dados do utilizador atual
+
+### Gestão de Utilizadores
+- GET /user/:id - Obtém utilizador por ID
+- DELETE /user/:id - Remove utilizador
+- GET /users - Lista todos utilizadores
+- GET /user/email/:email - Procura utilizador por email
+- PUT /user/update/:email - Atualiza dados do utilizador
+
+## 2. Filmes (/movies)
+
+### Gestão de Filmes
+- GET / - Lista todos os filmes
+- GET /findById/:id - Obtém filme por ID
+- POST /search - Pesquisa filmes
+- DELETE /remove/:id - Remove filme
+
+### Comentários
+- POST /:movieId/comments - Adiciona comentário (auth)
+- GET /:movieId/comments - Lista comentários
+- PUT /:movieId/comments/:commentId - Atualiza comentário (auth)
+- DELETE /:movieId/comments/:commentId - Remove comentário (auth)
+
+## 3. Sessões (/sessions)
+
+### Gestão de Sessões
+- GET / - Lista todas as sessões
+- GET /:id - Obtém sessão por ID
+- POST /create - Cria nova sessão
+- DELETE /:id - Remove sessão
+- GET /:id/report - Gera relatório da sessão
+
+### Gestão de Lugares
+- POST /checkAvailability - Verifica disponibilidade
+- PUT /:id/applyUnavailability - Marca lugares como indisponíveis
+- PUT /:id/cancelSession - Cancela sessão
+
+## 4. Reservas (/booking)
+
+### Gestão de Reservas
+- POST /create - Cria nova reserva
+- GET /:id - Obtém detalhes da reserva
+- GET /user/:userId - Lista reservas do utilizador
+- PUT /:id/cancel - Cancela reserva
+
+### Pagamentos
+- POST /webhook - Webhook do Stripe
+- POST /create-payment-intent - Cria intenção de pagamento
+- GET /payment-status/:id - Verifica estado do pagamento
+
+## 5. Salas de Cinema (/rooms)
+- GET / - Lista todas as salas
+- GET /:id - Obtém sala por ID
+- POST /create - Cria nova sala
+- PUT /:id - Atualiza sala
+- DELETE /:id - Remove sala
+
+## 6. Categorias (/categories)
+- GET / - Lista todas as categorias
+- POST /create - Cria nova categoria
+- PUT /:id - Atualiza categoria
+- DELETE /:id - Remove categoria
+
+## 7. Descontos (/discounts)
+- GET / - Lista todos os descontos
+- POST /create - Cria novo desconto
+- PUT /:id - Atualiza desconto
+- DELETE /:id - Remove desconto
+
+## 8. Pontos e Fidelização (/points)
+- GET /user/:userId - Obtém pontos do utilizador
+- POST /add - Adiciona pontos
+- POST /redeem - Resgata pontos
+- GET /history/:userId - Histórico de pontos
+
+## 9. Merchandise (/merchandise)
+- GET / - Lista todos os produtos
+- GET /:id - Obtém produto por ID
+- POST /create - Adiciona novo produto
+- PUT /:id - Atualiza produto
+- DELETE /:id - Remove produto
+
+## Notas de Segurança
+
+1. Autenticação
+- Rotas marcadas com (auth) requerem token de autenticação
+- Token enviado via cookie httpOnly ou header Authorization
+- Token expira em 24 horas
+
+2. Rate Limiting
+- Limite de requisições por IP
+- Proteção contra ataques de força bruta
+
+3. Validação
+- Validação de dados em todas as rotas
+- Sanitização de inputs
+- Verificação de permissões
+
+4. CORS
+- Configurado para permitir apenas origens autorizadas
+- Métodos HTTP permitidos: GET, POST, PUT, DELETE
+- Credentials: true para cookies
+
+5. Segurança
+- Headers de segurança configurados
+- Proteção contra XSS
+- Proteção contra CSRF via tokens
+- SSL/TLS em produção
