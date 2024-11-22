@@ -19,6 +19,7 @@ const movieController = {
   getComments,
   updateComment,
   deleteComment,
+  deleteAllComments
 };
 
 // Controlador para lidar com a busca de filmes
@@ -187,6 +188,22 @@ async function deleteComment(req, res, next) {
 
     await movieService.deleteComment(movieId, commentId);
     res.status(204).send();
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+}
+
+// Controlador para deletar todos os comentários (apenas admin)
+async function deleteAllComments(req, res, next) {
+  try {
+    // Verificar se o usuário é admin usando o roleUser e scope
+    if (!req.roleUser || !req.roleUser.scope.includes('admin')) {
+      throw new AuthorizationError("Apenas administradores podem deletar todos os comentários");
+    }
+
+    const result = await movieService.deleteAllComments();
+    res.status(200).json(result);
   } catch (error) {
     console.log(error);
     next(error);

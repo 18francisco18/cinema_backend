@@ -7,6 +7,7 @@ const VerifyToken = require("../../middleware/token");
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
 const UserService = require("../../data/users/service");
+const scopes = require("../../data/users/scopes");
 
 const AuthRouter = () => {
   let router = express();
@@ -18,29 +19,61 @@ const AuthRouter = () => {
 
   router
     .route("/register")
-    .post(function (req, res, next) {
-      const body = req.body;
-      console.log("User:", body);
-      body.role = { name: 'User', scope: ['user'] };
+    .post(async function (req, res, next) {
+      try {
+        const body = req.body;
+        console.log("Received registration request:", body);
+        
+        // Se não houver role definida, define como user normal
+        if (!body.role) {
+          body.role = { 
+            name: 'User', 
+            scope: [scopes.User] 
+          };
+        } else {
+          // Validar se o scope é válido
+          const validScopes = [scopes.Admin, scopes.User, scopes.Anonimous];
+          const requestedScope = body.role.scope;
+          
+          // Garantir que scope é um array
+          const scopeArray = Array.isArray(requestedScope) ? requestedScope : [requestedScope];
+          
+          // Verificar se todos os scopes são válidos
+          const isValidScope = scopeArray.every(scope => validScopes.includes(scope));
+          if (!isValidScope) {
+            return res.status(400).send({ error: "Invalid role scope" });
+          }
+          
+          // Atualizar o body com o scope formatado corretamente
+          body.role.scope = scopeArray;
+        }
 
-      Users.create(body)
-        .then(() => Users.createToken(body))
-        .then((response) => {
-          console.log("User token:", response);
-          res.cookie("token", response.token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 24 * 60 * 60 * 1000 // 24 hours
-          });
-          res.status(200).send(response);
-        })
-        .catch((err) => {
-          console.log("Error:", err);
-          res.status(500).send(err);
-          next();
+        console.log("Creating user with formatted data:", body);
+
+        // Criar o usuário
+        const createResult = await Users.create(body);
+        console.log("User creation result:", createResult);
+
+        // Criar o token
+        const tokenResult = await Users.createToken(body);
+        console.log("Token creation result:", tokenResult);
+
+        res.cookie("token", tokenResult.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
+        
+        res.status(200).send(tokenResult);
+      } catch (err) {
+        console.error("Registration error:", err);
+        if (err.name === "ValidationError") {
+          return res.status(400).send(err);
+        }
+        res.status(500).send(err);
+      }
     });
 
   router

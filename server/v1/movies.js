@@ -2,6 +2,7 @@ const bodyParser = require("body-parser");
 const express = require("express");
 const movieController = require("../../data/movies/controller");
 const verifyToken = require("../../middleware/token");
+const verifyAdmin = require("../../middleware/admin");
 
 function MoviesRouter() {
   let router = express();
@@ -20,6 +21,9 @@ function MoviesRouter() {
   router.get("/:movieId/comments", movieController.getComments);
   router.put("/:movieId/comments/:commentId", verifyToken, movieController.updateComment);
   router.delete("/:movieId/comments/:commentId", verifyToken, movieController.deleteComment);
+  
+  // Rota administrativa para deletar todos os comentários
+  router.delete("/comments/deleteAll", verifyToken, verifyAdmin, movieController.deleteAllComments);
 
   return router;
 }

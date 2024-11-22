@@ -143,21 +143,27 @@ function UserService(UserModel) {
     }
   }
 
-  function createToken(user) {
-    let token = jwt.sign(
-      { 
-        id: user._id, 
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        role: user.role.scopes 
-      },
-      config.secret,
-      {
-        expiresIn: config.expiresPassword,
-      }
-    );
-    return { auth: true, token };
+  async function createToken(user) {
+    try {
+      const foundUser = await UserModel.findOne({ email: user.email });
+      if (!foundUser) throw new NotFoundError("User not found");
+
+      const token = jwt.sign(
+        { 
+          id: foundUser._id,
+          role: foundUser.role,
+          email: foundUser.email
+        },
+        config.secret,
+        {
+          expiresIn: 86400, // expires in 24 hours
+        }
+      );
+
+      return { auth: true, token: token };
+    } catch (err) {
+      throw err;
+    }
   }
 
   function createPassword(user) {

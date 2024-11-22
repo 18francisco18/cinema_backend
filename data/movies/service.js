@@ -23,6 +23,7 @@ function MovieService(movieModel) {
     getMovieComments,
     updateComment,
     deleteComment,
+    deleteAllComments
   };
 
   async function create(movie) {
@@ -207,7 +208,21 @@ function MovieService(movieModel) {
 
       movie.comments.push(commentData);
       await movie.save();
-      return movie.comments[movie.comments.length - 1];
+      
+      // Populate user data for the new comment
+      const savedComment = movie.comments[movie.comments.length - 1];
+      await movie.populate({
+        path: 'comments.user',
+        select: 'username name',
+        match: { _id: savedComment.user }
+      });
+      
+      const commentWithUsername = {
+        ...savedComment.toObject(),
+        username: savedComment.user ? savedComment.user.username : 'Unknown User'
+      };
+      
+      return commentWithUsername;
     } catch (error) {
       if (error instanceof NotFoundError || error instanceof ConflictError) {
         throw error;
@@ -218,11 +233,21 @@ function MovieService(movieModel) {
 
   async function getMovieComments(movieId) {
     try {
-      const movie = await movieModel.findById(movieId);
+      const movie = await movieModel.findById(movieId).populate({
+        path: 'comments.user',
+        select: 'username name'
+      });
       if (!movie) {
         throw new NotFoundError("Filme não encontrado");
       }
-      return movie.comments;
+      
+      // Map comments to include username
+      const commentsWithUsername = movie.comments.map(comment => ({
+        ...comment.toObject(),
+        username: comment.user ? comment.user.username : 'Unknown User'
+      }));
+      
+      return commentsWithUsername;
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -245,7 +270,20 @@ function MovieService(movieModel) {
 
       Object.assign(comment, updateData);
       await movie.save();
-      return comment;
+      
+      // Populate user data for the updated comment
+      await movie.populate({
+        path: 'comments.user',
+        select: 'username name',
+        match: { _id: comment.user }
+      });
+      
+      const commentWithUsername = {
+        ...comment.toObject(),
+        username: comment.user ? comment.user.username : 'Unknown User'
+      };
+      
+      return commentWithUsername;
     } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
@@ -279,6 +317,23 @@ function MovieService(movieModel) {
         throw error;
       }
       throw new DatabaseError("Erro ao deletar comentário");
+    }
+  }
+
+  async function deleteAllComments() {
+    try {
+      // Find all movies and update them to remove all comments
+      const result = await movieModel.updateMany(
+        {}, // Match all documents
+        { $set: { comments: [] } } // Set comments to empty array
+      );
+      
+      return {
+        modifiedCount: result.modifiedCount,
+        message: `Comments deleted from ${result.modifiedCount} movies`
+      };
+    } catch (error) {
+      throw new DatabaseError("Error deleting all comments");
     }
   }
 
