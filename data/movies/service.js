@@ -199,7 +199,7 @@ function MovieService(movieModel) {
 
       // Check if user already commented on this movie
       const existingComment = movie.comments.find(
-        comment => comment.user.toString() === commentData.user.toString()
+        comment => comment.user && commentData.user && comment.user.toString() === commentData.user
       );
       if (existingComment) {
         throw new ConflictError("Você já comentou neste filme");
