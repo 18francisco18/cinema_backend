@@ -99,13 +99,12 @@ async function createComment(req, res, next) {
     const validatedRating = await validateRating(rating);
 
     const comment = await movieService.addComment(movieId, {
-      comment: text, // Alterado de text para comment para corresponder ao schema
+      user: userId,
+      comment: text, // Mudando de text para comment para corresponder ao schema
       rating: validatedRating,
-      user: userId, // Alterado de userId para user para corresponder ao schema
-      createdAt: new Date(),
     });
 
-    res.status(201).send(comment);
+    res.status(201).json(comment);
   } catch (error) {
     console.log(error);
     next(error);

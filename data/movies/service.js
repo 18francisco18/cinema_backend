@@ -197,11 +197,19 @@ function MovieService(movieModel) {
         throw new NotFoundError("Filme não encontrado");
       }
 
+      // Check if user already commented on this movie
+      const existingComment = movie.comments.find(
+        comment => comment.user.toString() === commentData.user.toString()
+      );
+      if (existingComment) {
+        throw new ConflictError("Você já comentou neste filme");
+      }
+
       movie.comments.push(commentData);
       await movie.save();
       return movie.comments[movie.comments.length - 1];
     } catch (error) {
-      if (error instanceof NotFoundError) {
+      if (error instanceof NotFoundError || error instanceof ConflictError) {
         throw error;
       }
       throw new DatabaseError("Erro ao adicionar comentário");
@@ -253,12 +261,17 @@ function MovieService(movieModel) {
         throw new NotFoundError("Filme não encontrado");
       }
 
-      const comment = movie.comments.id(commentId);
-      if (!comment) {
+      // Find the comment index
+      const commentIndex = movie.comments.findIndex(
+        comment => comment._id.toString() === commentId
+      );
+      
+      if (commentIndex === -1) {
         throw new NotFoundError("Comentário não encontrado");
       }
 
-      comment.remove();
+      // Remove the comment using pull
+      movie.comments.pull({ _id: commentId });
       await movie.save();
       return true;
     } catch (error) {
