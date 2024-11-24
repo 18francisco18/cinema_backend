@@ -9,9 +9,11 @@ function DiscountsRouter() {
     router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
     router.get("/all", discountController.getAllStripeDiscounts);
+    router.get("/allDiscountedProducts", discountController.findAllDiscountedProducts);
 
     router.post("/createPromoCode", discountController.createDiscountForProduct);
     router.post("/apply-discount/:productId", discountController.applyDiscountToProduct);
+    router.post("/remove-discount/:productId", discountController.removeDiscountFromProduct);
     // fazer rota para encerrar promoção
     
 

@@ -4,7 +4,8 @@ const discountController = {
     createDiscountForProduct,
     getAllStripeDiscounts,
     applyDiscountToProduct,
-    checkForExpiredDiscounts,
+    removeDiscountFromProduct,
+    findAllDiscountedProducts,
 }
 
 async function createDiscountForProduct(req, res, next) {
@@ -26,6 +27,7 @@ async function getAllStripeDiscounts(req, res, next) {
     }
 }
 
+// Controlador para aplicar desconto a um produto
 async function applyDiscountToProduct(req, res, next) {
     try {
         const { productId } = req.params;
@@ -37,13 +39,28 @@ async function applyDiscountToProduct(req, res, next) {
     }
 }
 
-async function checkForExpiredDiscounts(req, res, next) {
+// Controlador para remover o desconto de um produto
+async function removeDiscountFromProduct(req, res, next) {
     try {
-        const check = await discountService.checkForExpiredDiscounts();
-        res.status(200).json(check);
+        const { productId } = req.params;
+        const product = await discountService.removeDiscountFromProduct(productId);
+        res.status(200).json(product);
     } catch (error) {
         next(error)
     }
 }
+
+// Controlador para buscar todos os produtos com desconto
+async function findAllDiscountedProducts(req, res, next) {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const products = await discountService.findAllDiscountedProducts(page, limit);
+        res.status(200).json(products);
+    } catch (error) {
+        next(error)
+    }
+}
+
 
 module.exports = discountController;

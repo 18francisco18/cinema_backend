@@ -18,6 +18,8 @@ function discountsService(discountModel) {
         createDiscountCoupon,
         findAllStripeDiscounts,
         applyDiscountToProduct,
+        removeDiscountFromProduct,
+        findAllDiscountedProducts,
         checkForExpiredDiscounts,
     }
 
@@ -81,6 +83,49 @@ function discountsService(discountModel) {
             await product.save();
 
             return discountedPrice;
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+    }
+
+    async function removeDiscountFromProduct(productId) {
+        try {
+            const product = await Product.findById(productId);
+            if (!product) throw new NotFoundError("Produto não encontrado");
+
+            product.discountedPrice = undefined; // Remover preço com desconto
+            product.discountExpiration = undefined; // Remover validade do desconto
+            await product.save();
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+    }
+
+    async function findAllDiscountedProducts(page = 1, limit = 10) {
+        try {
+            
+
+            // Paginar resultados
+            const skip = (page - 1) * limit;
+            const products = await Product.find({
+              discountedPrice: { $exists: true },
+            }).skip(skip).limit(limit);
+            const total = await Product.countDocuments({
+                discountedPrice: { $exists: true },
+            });
+
+            if (products.length === 0) throw new NotFoundError("Nenhum produto com desconto encontrado");
+            
+            return {
+                products,
+                page,
+                total,
+                pages: Math.ceil(total / limit),
+                previous: page > 1 ? page - 1 : null,
+                next: page < Math.ceil(total / limit) ? page + 1 : null,
+            }
         } catch (error) {
             console.log(error);
             throw error;
