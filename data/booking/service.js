@@ -50,72 +50,127 @@ function bookingService(bookingModel) {
     findAllBookingsForSession,
   };
 
+  // Função para redimir produtos com pontos
+  async function redeemItemsWithPoints(userId, products, session) {
+    const user = await userModel.findById(userId).session(session);
+    if (!user) throw new NotFoundError("User not found");
+
+    // Array para armazenar os produtos redimidos
+    const redeemedProducts = [];
+
+    // Iterar sobre cada produto no array
+    for (const item of products) {
+      // Verificar se o produto foi redimido com pontos
+      if (item.redeemedWithPoints) {
+        const product = await Product.findById(item.product)
+          .populate("pointsRef")
+          .session(session);
+
+        if (!product)
+          throw new NotFoundError(`Product not found: ${item.product}`);
+
+        // Verificar se o produto tem um preço em pontos
+        const pointsCost = product.pointsRef?.points || 0;
+
+        // Verificar pontos suficientes
+        const totalPointsRequired = pointsCost * (item.quantity || 1);
+        if (user.points < totalPointsRequired) {
+          throw new ValidationError(
+            `Insufficient points for product: ${product.name}`
+          );
+        }
+
+        // Deduzir pontos
+        user.points -= totalPointsRequired;
+
+        // Adicionar o produto redimido ao array
+        redeemedProducts.push({
+          product: product._id,
+          quantity: item.quantity || 1,
+          redeemedWithPoints: true,
+        });
+      } else {
+        // Adicionar o produto ao array sem redimir pontos
+        redeemedProducts.push({
+          product: item.product,
+          quantity: item.quantity || 1,
+          redeemedWithPoints: false,
+        });
+      }
+    }
+
+    await user.save({ session });
+    return redeemedProducts;
+  }
+
   async function create(booking, sessionId) {
     const session = await mongoose.startSession();
-    session.startTransaction(); // Iniciar uma transação
+    session.startTransaction();
 
     try {
-      // Buscar a sessão associada à reserva com a transação.
+      // Redimir produtos com pontos
+      booking.products = await redeemItemsWithPoints(
+        booking.user,
+        booking.products,
+        session
+      );
+
+      // Buscar a sessão associada
       const sessionData = await sessionModel
         .findById(sessionId)
         .session(session);
+      if (!sessionData) throw new NotFoundError("Session not found");
 
-      // Caso a sessão não exista, lançar um erro.
-      if (!sessionData) {
-        throw new NotFoundError("Session not found");
-      }
-
-      // Caso a sessão esteja cheia, lançar um erro.
-      if (sessionData.status === sessionStatus.soldOut) {
-        throw new ConflictError("Session is sold out");
-      }
-
-      // Caso a sessão esteja cancelada, lançar um erro.
-      if (sessionData.status === sessionStatus.cancelled) {
-        throw new ValidationError("Session is cancelled");
-      }
-
-      // Caso a sessão esteja finalizada, lançar um erro.
-      if (sessionData.status === sessionStatus.finished) {
-        throw new ValidationError("Session is finished");
-      }
-
-      // Caso a sessão esteja no passado, lançar um erro.
-      if (new Date(sessionData.endTime) < new Date()) {
-        throw new ValidationError("Cannot book a session in the past");
-      }
-
-      // Obter a lista de assentos da sessão especificada.
-      const sessionSeats = sessionData.seats.flat();
-
-      // Filtrar os assentos solicitados na reserva que não estão disponíveis.
-      const invalidSeats = booking.seats.filter((seat) => {
-        const sessionSeat = sessionSeats.find((s) => s.seat === seat);
-        return !sessionSeat || sessionSeat.status !== seatStatus.available;
-      });
-
-      // Se existirem assentos inválidos, lançar um erro.
-      if (invalidSeats.length > 0) {
+      // Verificar o status da sessão
+      if (
+        sessionData.status !== sessionStatus.available &&
+        new Date(sessionData.endTime) < new Date()
+      ) {
         throw new ValidationError(
-          `The following seats are invalid or unavailable: ${invalidSeats.join(
-            ", "
-          )}`
+          "Cannot book a session with invalid status or in the past"
         );
       }
 
-      // Calcular o valor total da reserva multiplicando o número de assentos com o preço de cada bilhete da sessão.
-      const totalAmount = booking.seats.length * sessionData.price;
+      // Verificar assentos
+      const invalidSeats = booking.seats.filter((seat) => {
+        // Verificar se o assento está disponível
+        const sessionSeat = sessionData.seats
+          .flat()
+          .find((s) => s.seat === seat);
+        return !sessionSeat || sessionSeat.status !== seatStatus.available;
+      });
 
-      // Criar a nova reserva, inserindo os dados de booking e o valor total calculado.
-      let newBooking = new bookingModel({
+      // Se o assento não estiver disponível ou não existir, lançar um erro
+      if (invalidSeats.length > 0) {
+        throw new ValidationError(
+          `Invalid or unavailable seats: ${invalidSeats.join(", ")}`
+        );
+      }
+
+      // Calcular o total
+      let totalAmount = booking.seats.length * sessionData.price;
+
+      // Adicionar o preço de cada produto ao total
+      for (const item of booking.products) {
+        if (!item.redeemedWithPoints) {
+          const product = await Product.findById(item.product).session(session);
+
+          // Adiciona o preço do produto multiplicado pela quantidade ao total
+          totalAmount += product.price * (item.quantity || 1);
+        }
+      }
+
+      // Criar a reserva
+      const newBooking = new bookingModel({
         ...booking,
         totalAmount,
         paymentStatus: "pending",
       });
 
-      const savedBooking = await newBooking.save({ session }); // Salvar a reserva no banco de dados dentro da transação.
+      // Salvar a reserva
+      const savedBooking = await newBooking.save({ session });
 
-      // Atualizar o status dos assentos reservados para "reservado".
+      // Atualizar assentos
       sessionData.seats = sessionData.seats.map((row) =>
         row.map((seat) => {
           if (booking.seats.includes(seat.seat)) {
@@ -125,43 +180,41 @@ function bookingService(bookingModel) {
         })
       );
 
-      // Verificar se ainda existem assentos disponíveis na sessão.
+      // Verificar se existem assentos disponíveis restantes
       const remainingAvailableSeats = sessionData.seats
         .flat()
         .some((seat) => seat.status === seatStatus.available);
+      if (!remainingAvailableSeats) sessionData.status = sessionStatus.soldOut;
 
-      if (!remainingAvailableSeats) {
-        sessionData.status = sessionStatus.soldOut; // Marcar a sessão como esgotada.
-      }
+      // Salvar a sessão atualizada
+      await sessionData.save({ session });
 
-      await sessionData.save({ session }); // Salvar a sessão com os assentos atualizados dentro da transação.
+      // Terminar a transação
+      await session.commitTransaction();
+      session.endSession();
 
-      console.log("Session updated with reserved seats");
-
-      // Confirmar a transação.
-      await session.commitTransaction(); // Confirmar a transação.
-      session.endSession(); // Encerrar a sessão.~
-
-      // Criar a sessão de pagamento no Stripe.
+      // Criar sessão de pagamento no Stripe
       const paymentConfirmation = await createPaymentSession(savedBooking);
 
-      // Retornar a reserva.
       return { booking: savedBooking, paymentUrl: paymentConfirmation.url };
     } catch (error) {
-      await session.abortTransaction(); // Cancelar a transação em caso de erro.
-      session.endSession(); // Encerrar a sessão.
-      console.log(error);
+      // Cancelar a transação em caso de erro
+      await session.abortTransaction();
+      session.endSession();
+      console.error("Erro ao criar reserva:", error);
       throw error;
     }
   }
 
-  // Função para eliminar reserva caso pagamento não seja feito dentro de 5 minutos
+  // Função para verificar se o pagamento está pendente após 5 minutos
   async function checkingForPendingFiveMinutes(bookingId, paymentIntentId) {
     console.log("Scheduling booking deletion in 5 minutes");
     try {
       setTimeout(async () => {
         try {
-          const booking = await bookingModel.findById(bookingId);
+          const booking = await bookingModel
+            .findById(bookingId)
+            .populate("products.product");
           if (!booking) {
             throw new NotFoundError("Booking not found");
           }
@@ -173,18 +226,41 @@ function bookingService(bookingModel) {
               await cancelPaymentIntent(paymentIntentId);
             }
 
+            // Devolver os pontos ao usuário
+            if (booking.products) {
+              const user = await userModel.findById(booking.user);
+              if (!user) {
+                throw new NotFoundError("User not found");
+              }
+
+              // Verificar cada produto do booking
+              booking.products.forEach((item) => {
+                if (item.redeemedWithPoints) {
+                  // Verificar quantos pontos o produto custou
+                  const pointsCost = item.product.pointsRef?.points || 0;
+                  user.points += pointsCost * item.quantity;
+                }
+              });
+
+              // Salvar os pontos atualizados do usuário
+              await user.save();
+              console.log("Points refunded to user");
+            }
+
             // Atualização do status dos assentos reservados
             const session = await sessionModel.findById(booking.session);
-            // Atualizar o status dos assentos reservados para "available"
-            session.seats = session.seats.map((row) =>
-              row.map((seat) => {
-                if (booking.seats.includes(seat.seat)) {
-                  return { ...seat, status: "available" };
-                }
-                return seat;
-              })
-            );
-            await session.save();
+            if (session) {
+              session.seats = session.seats.map((row) =>
+                row.map((seat) => {
+                  if (booking.seats.includes(seat.seat)) {
+                    return { ...seat, status: "available" };
+                  }
+                  return seat;
+                })
+              );
+              await session.save();
+              console.log("Seats status updated to available");
+            }
 
             // Remover a reserva do banco de dados
             await removeById(bookingId);
@@ -300,58 +376,53 @@ function bookingService(bookingModel) {
             path: "cinema",
           },
         });
-      if (!session) {
-        throw new NotFoundError("Session not found");
-      }
 
-      if (!booking.user._id) {
-        throw new NotFoundError("User not found");
-      }
+      if (!session) throw new NotFoundError("Session not found");
+      if (!booking.user._id) throw new NotFoundError("User not found");
 
-      const products = await Product.find({
-        _id: { $in: booking.products.map((p) => p._id) },
-      });
       const line_items = [];
 
-      // Adicionar cada produto do booking ao line_items
-      products.forEach((product) => {
-        const matchingProducts = booking.products.filter((p) =>
-          p._id.equals(product._id)
-        );
-        const quantity = matchingProducts.length;
+      // Adicionar cada objeto da array de produtos em booking ao line_items
+      for (const item of booking.products) {
+        const product = await Product.findById(item.product._id);
+        if (!product) throw new NotFoundError(`Product not found: ${item.product._id}`);
 
-        if (quantity > 0) {
-          console.log(matchingProducts);
-          console.log(product.discountedPrice);
+        console.log(`Product ID: ${product}`);
+        console.log(`Discounted Price: ${product.discountedPrice}`);
+        console.log(`Discount Expiration: ${product.discountExpiration}`);
+        console.log(`Current Date: ${new Date()}`);
 
-          console.log(`Product ID: ${product._id}`);
-          console.log(`Discounted Price: ${product.discountedPrice}`);
-          console.log(`Discount Expiration: ${product.discountExpiration}`);
-          console.log(`Current Date: ${new Date()}`);
 
-          const isDiscountValid =
-            product.discountedPrice && product.discountExpiration > new Date();
-          const priceToCharge = isDiscountValid
-            ? product.discountedPrice
-            : product.price;
-          console.log(`Is Discount Valid: ${isDiscountValid}`);
-          console.log(`Price to charge: ${priceToCharge}`); // Adicione um log para verificar o preço
+        // Verificar se o desconto é válido
+        const isDiscountValid =
+          product.discountedPrice && product.discountExpiration > new Date();
 
-          // Adicionar o produto ao line_items com a quantidade correta
-          line_items.push({
-            price_data: {
-              currency: "eur",
-              product_data: {
-                name: product.name,
-                description: product.description,
-                images: [product.image],
-              },
-              unit_amount: priceToCharge * 100, // O Stripe lida com valores em centavos
+        // Calcular o preço a cobrar com base no desconto
+        const applyPrice = isDiscountValid
+          ? product.discountedPrice
+          : product.price;
+
+        // Verificar se o produto foi redimido com pontos, se sim, o preço é 0
+        // caso contrário, o preço é o preço normal (ou com desconto) do produto
+        const priceToCharge = item.redeemedWithPoints ? 0 : applyPrice;
+
+        console.log(`Is Discount Valid: ${isDiscountValid}`);
+        console.log(`Price to charge: ${priceToCharge}`);
+
+        // Adicionar o produto ao line_items com a quantidade correta
+        line_items.push({
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: product.name,
+              description: product.description,
+              images: [product.image],
             },
-            quantity: quantity, // Quantidade correta
-          });
-        }
-      });
+            unit_amount: priceToCharge * 100, // O Stripe lida com valores em centavos
+          },
+          quantity: item.quantity, // Quantidade correta
+        });
+      }
 
       // Adicionar o ingresso ao line_items
       line_items.push({
@@ -479,7 +550,6 @@ function bookingService(bookingModel) {
       const qrCode = await QRCode.toDataURL(
         JSON.stringify({ qrCodeId, token })
       );
-
 
       populatedBooking.tickets = tickets;
       await populatedBooking.save();
@@ -832,11 +902,12 @@ function bookingService(bookingModel) {
         amount: amount, // Valor a ser reembolsado (em centavos)
       });
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
       await userModel.findByIdAndUpdate(paymentIntent.metadata.userId, {
         $inc: { points: -paymentIntent.amount }, // Decrementar pontos do utilizador
-
-      }) 
+      });
 
       console.log("Reembolso criado:", refund);
       return refund;

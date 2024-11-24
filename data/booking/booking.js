@@ -24,6 +24,7 @@ const bookingSchema = new Schema({
       product: { type: Schema.Types.ObjectId, ref: "Product" },
       quantity: { type: Number },
       finalPrice: { type: Number },
+      redeemedWithPoints: { type: Boolean, default: false },
     },
   ],
 });

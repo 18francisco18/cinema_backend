@@ -1,5 +1,6 @@
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const User = require("../users/user"); // Certifique-se de que o caminho está correto
+const User = require("../users/user"); 
+const Product = require("../products/product")
 const {
   ValidationError,
   AuthenticationError,
@@ -14,12 +15,24 @@ function pointsService(pointsModel) {
   let service = {
     redeemPointsForDiscount,
     createPromoCode,
+    addProductToPointSystem,
+    removeProductFromPointSystem,
   };
 
   async function addProductToPointSystem(product) {
     try {
+
+      console.log(product);
+
+    const productRef = await Product.findById(product.product);
+    if (!productRef) throw new NotFoundError("Produto não encontrado");
+
     const points = await pointsModel.create(product);
-    await points.save();
+    productRef.pointsRef = points._id;
+    await Promise.all([
+      productRef.save(),
+      points.save(),
+    ]);
     return points;
   } catch (err) {
     console.log(err);
@@ -65,7 +78,7 @@ function pointsService(pointsModel) {
     if (user.points >= pointsToRedeem) {
       const promoCode = await createPromoCode(discountAmount);
 
-      // Deduz os pontos do usuário e salva no banco de dados
+      // Deduz os pontos do utilizador e salva no banco de dados
       user.points -= pointsToRedeem;
       await user.save();
 

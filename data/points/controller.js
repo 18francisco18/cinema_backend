@@ -3,6 +3,7 @@ const User = require("../users/user");
 
 const pointsController = {
   redeemPoints,
+  addProductToPointsSystem,
 };
 
 async function redeemPoints(req, res) {
@@ -18,6 +19,17 @@ async function redeemPoints(req, res) {
     res.json({ success: true, promoCode: result.promoCode });
   } else {
     res.json({ success: false, message: result.message });
+  }
+}
+
+async function addProductToPointsSystem(req, res, next) {
+
+  try {
+    const productId = req.body;
+    const points = await pointsService.addProductToPointSystem(productId);
+    res.status(200).json(points);
+  } catch (err) {
+    next(err);
   }
 }
 
