@@ -9,6 +9,7 @@ function SessionsRouter() {
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
   router.get("/", sessionsController.getSessions);
+  router.get("/movie/:movieId", sessionsController.getSessionsByMovie);
   router.get("/:id", sessionsController.getSessionById);
   router.get("/:id/report", sessionsController.getSessionsReport);
 

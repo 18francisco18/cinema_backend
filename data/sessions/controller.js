@@ -5,6 +5,7 @@ const sessionsController = {
     cancelSession,
     getSessions,
     getSessionById,
+    getSessionsByMovie,
     deleteSession,
     checkAvailability,
     checkAndUpdateSessions,
@@ -48,7 +49,8 @@ async function getSessions(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const sessions = await sessionService.findAll(page, limit);
+    const movie = req.query.movie;
+    const sessions = await sessionService.findAll(page, limit, movie);
     res.status(200).json(sessions);
   } catch (error) {
     next(error);
@@ -126,6 +128,20 @@ async function getSessionsReport(req, res, next) {
     const { id } = req.params;
     const sessionsReport = await sessionService.generateSessionReport(id);
     res.status(200).json(sessionsReport);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Controlador para buscar sessões por filme
+async function getSessionsByMovie(req, res, next) {
+  try {
+    const { movieId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const sessions = await sessionService.findByMovie(movieId, page, limit);
+    res.status(200).json(sessions);
   } catch (error) {
     next(error);
   }
