@@ -104,7 +104,7 @@ async function deleteMerchandise(req, res) {
 // Função para resgatar um merchandise usando pontos do usuário
 async function redeemMerchandise(req, res) {
   const { merchandiseId } = req.params;
-  const { userId } = req.body; // Assumindo que o ID do usuário será passado no corpo da requisição
+  const userId = req.userId; // Get userId from the verified token
 
   try {
     // Encontrar o usuário pelo ID
@@ -142,8 +142,10 @@ async function redeemMerchandise(req, res) {
       success: true,
       message: "Merchandise redeemed successfully",
       redeemedItem: merchandise,
+      remainingPoints: user.points
     });
   } catch (error) {
+    console.error('Error in redeemMerchandise:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 }

@@ -152,7 +152,8 @@ const AuthRouter = () => {
           name: user.name,
           username: user.username,
           email: user.email,
-          role: user.role
+          role: user.role,
+          points: user.points || 0
         };
 
         res.status(200).send(userData);
