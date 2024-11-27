@@ -181,6 +181,23 @@ function bookingService(bookingModel) {
       // Salvar a reserva
       const savedBooking = await newBooking.save({ session });
 
+      // Criar tickets para cada assento
+      const tickets = await Promise.all(
+        booking.seats.map(async (seat) => {
+          const ticketData = {
+            booking: savedBooking._id,
+            seat: seat,
+            status: "booked"
+          };
+          const ticket = await ticketModel.create(ticketData);
+          return ticket._id;
+        })
+      );
+
+      // Adicionar os tickets à reserva
+      savedBooking.tickets = tickets;
+      await savedBooking.save({ session });
+
       // Atualizar assentos
       sessionData.seats = sessionData.seats.map((row) =>
         row.map((seat) => {
@@ -483,14 +500,14 @@ function bookingService(bookingModel) {
           "card", // Cartão de crédito/débito
           "multibanco", // Para Multibanco (Portugal)
         ],
+        metadata: {
+          bookingId: booking._id.toString(),
+          userId: booking.user._id.toString(),
+          sessionId: booking.session._id.toString(),
+          movieId: session.movie._id.toString(),
+          roomId: session.room._id.toString(),
+        },
         payment_intent_data: {
-          metadata: {
-            bookingId: booking._id.toString(),
-            userId: booking.user._id.toString(),
-            sessionId: booking.session._id.toString(),
-            movieId: session.movie._id.toString(),
-            roomId: session.room._id.toString(),
-          },
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
@@ -859,7 +876,6 @@ function bookingService(bookingModel) {
       const paymentIntent = await stripe.paymentIntents.retrieve(
         booking.paymentIntentId
       );
-
       // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
       const chargeId = paymentIntent.latest_charge;
       const charge = await stripe.charges.retrieve(chargeId);
