@@ -28,11 +28,22 @@ const {
 dotenv.config();
 
 const transporter = nodeMailer.createTransport({
-  service: "outlook",
+  service: 'Outlook365',
   auth: {
     user: process.env.EMAIL_ADDRESS,
-    pass: process.env.EMAIL_PASSWORD,
+    pass: process.env.EMAIL_PASSWORD
   },
+  debug: true, // Ativa logs detalhados
+  logger: true // Ativa logs do transporter
+});
+
+// Verificar a conexão do transporter
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('Erro na verificação do transporter:', error);
+  } else {
+    console.log('Servidor pronto para enviar emails');
+  }
 });
 
 function bookingService(bookingModel) {
@@ -332,7 +343,28 @@ function bookingService(bookingModel) {
         };
 
         // Enviar o e-mail com o QR Code
-        await transporter.sendMail(mailOptions);
+        console.log('Configurações de email:', {
+          from: mailOptions.from,
+          to: mailOptions.to,
+          subject: mailOptions.subject
+        });
+        
+        try {
+          const info = await transporter.sendMail(mailOptions);
+          console.log('Email enviado com sucesso:', {
+            messageId: info.messageId,
+            response: info.response,
+            envelope: info.envelope
+          });
+        } catch (emailError) {
+          console.error('Erro detalhado ao enviar email:', {
+            code: emailError.code,
+            command: emailError.command,
+            response: emailError.response,
+            responseCode: emailError.responseCode,
+            stack: emailError.stack
+          });
+        }
 
         // Salvar a reserva atualizada com o status de pagamento
         await booking.save();
@@ -401,6 +433,9 @@ function bookingService(bookingModel) {
         const applyPrice = isDiscountValid
           ? product.discountedPrice
           : product.price;
+
+        console.log(`Is Discount Valid: ${isDiscountValid}`);
+        console.log(`Price to charge: ${applyPrice}`);
 
         // Verificar se o produto foi redimido com pontos, se sim, o preço é 0
         // caso contrário, o preço é o preço normal (ou com desconto) do produto
