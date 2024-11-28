@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const merchandiseController = require("../../data/merchandise/controller"); // Certifique-se de que o caminho está correto
+const merchandiseController = require("../../data/merchandise/controller");
+const verifyTokenMiddleware = require("../../middleware/token");
 
 function MerchandiseRouter() {
   let router = express();
@@ -8,15 +9,15 @@ function MerchandiseRouter() {
   router.use(bodyParser.json({ limit: "100mb" }));
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
+  // Public routes
   router.get("/merchandise", merchandiseController.getAllMerchandise);
   router.get("/merchandise/:id", merchandiseController.getMerchandiseById);
-  router.post("/merchandise", merchandiseController.createMerchandise);
-  router.put("/merchandise/:id", merchandiseController.updateMerchandise);
-  router.delete("/merchandise/:id", merchandiseController.deleteMerchandise);
-  router.post(
-    "/redeem/:merchandiseId",
-    merchandiseController.redeemMerchandise
-  );
+
+  // Protected routes that require authentication
+  router.post("/merchandise", verifyTokenMiddleware, merchandiseController.createMerchandise);
+  router.put("/merchandise/:id", verifyTokenMiddleware, merchandiseController.updateMerchandise);
+  router.delete("/merchandise/:id", verifyTokenMiddleware, merchandiseController.deleteMerchandise);
+  router.post("/redeem/:merchandiseId", verifyTokenMiddleware, merchandiseController.redeemMerchandise);
 
   return router;
 }

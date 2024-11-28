@@ -21,6 +21,7 @@ function sessionService(sessionModel) {
   let service = {
     create,
     findAll,
+    findByMovie,
     deleteSession,
     findById,
     checkAvailability,
@@ -95,12 +96,17 @@ function sessionService(sessionModel) {
 
   // Função para buscar todas as sessões
   // falta fazer paginação e sorting.
-  async function findAll(page = 1, limit = 10) {
+  async function findAll(page = 1, limit = 10, movieId = null) {
     try {
-
       const skip = (page - 1) * limit;
-      let sessions = await sessionModel.find().skip(skip).limit(limit);
-      const total = await sessions.countDocuments();
+      const query = movieId ? { movie: movieId } : {};
+      const sessions = await Session.find(query)
+        .skip(skip)
+        .limit(limit)
+        .populate('room', 'name')  // Popula apenas o nome da sala
+        .populate('movie', 'title')  // Popula apenas o título do filme
+        .sort({ date: 1, startTime: 1 });  // Ordena por data e hora
+      const total = await Session.countDocuments(query);
       const totalPages = Math.ceil(total / limit);
 
       if (!sessions) throw new DatabaseError("Error finding all sessions");
@@ -122,6 +128,42 @@ function sessionService(sessionModel) {
     }
   }
 
+  // Função específica para buscar sessões por filme
+  async function findByMovie(movieId, page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+      
+      const sessions = await Session.find({ movie: movieId })
+        .skip(skip)
+        .limit(limit)
+        .populate('room', 'name')
+        .populate('movie', 'title')
+        .sort({ date: 1, startTime: 1 });
+
+      const total = await Session.countDocuments({ movie: movieId });
+      const totalPages = Math.ceil(total / limit);
+
+      if (!sessions) throw new DatabaseError("Error finding sessions for movie");
+      if (sessions.length === 0) throw new NotFoundError("No sessions found for this movie");
+      if (page > totalPages) {
+        throw new ValidationError(`Invalid page. Total pages available: ${totalPages}`);
+      }
+
+      return {
+        sessions,
+        pagination: {
+          total,
+          totalPages,
+          currentPage: page,
+          limit
+        }
+      };
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
   async function deleteSession(sessionId) {
     try {
       let session = await sessionModel.findById(sessionId);
@@ -137,12 +179,41 @@ function sessionService(sessionModel) {
 
   async function findById(sessionId) {
     try {
-      let session = await sessionModel.findById(sessionId);
-      if (!session) throw new NotFoundError("Session not found");
+      const session = await Session.findById(sessionId)
+        .populate('movie', 'title poster')
+        .populate('room', 'name capacity');
+
+      if (!session) {
+        throw new NotFoundError("Session not found");
+      }
+
+      // Gerar matriz de assentos se ainda não existir
+      if (!session.seats || session.seats.length === 0) {
+        const totalSeats = session.room.capacity;
+        const rows = Math.ceil(Math.sqrt(totalSeats));
+        const seatsPerRow = Math.ceil(totalSeats / rows);
+        
+        const seats = [];
+        let seatNumber = 1;
+        
+        for (let row = 0; row < rows; row++) {
+          const rowSeats = [];
+          for (let col = 0; col < seatsPerRow && seatNumber <= totalSeats; col++) {
+            rowSeats.push({
+              seat: `${String.fromCharCode(65 + row)}${col + 1}`,
+              status: 'available'
+            });
+            seatNumber++;
+          }
+          seats.push(rowSeats);
+        }
+        
+        session.seats = seats;
+        await session.save();
+      }
 
       return session;
     } catch (error) {
-      console.log(error);
       throw error;
     }
   }

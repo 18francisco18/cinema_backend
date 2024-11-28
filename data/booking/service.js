@@ -28,11 +28,22 @@ const {
 dotenv.config();
 
 const transporter = nodeMailer.createTransport({
-  service: "outlook",
+  service: 'Outlook365',
   auth: {
     user: process.env.EMAIL_ADDRESS,
-    pass: process.env.EMAIL_PASSWORD,
+    pass: process.env.EMAIL_PASSWORD
   },
+  debug: true, // Ativa logs detalhados
+  logger: true // Ativa logs do transporter
+});
+
+// Verificar a conexão do transporter
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('Erro na verificação do transporter:', error);
+  } else {
+    console.log('Servidor pronto para enviar emails');
+  }
 });
 
 function bookingService(bookingModel) {
@@ -169,6 +180,23 @@ function bookingService(bookingModel) {
 
       // Salvar a reserva
       const savedBooking = await newBooking.save({ session });
+
+      // Criar tickets para cada assento
+      const tickets = await Promise.all(
+        booking.seats.map(async (seat) => {
+          const ticketData = {
+            booking: savedBooking._id,
+            seat: seat,
+            status: "booked"
+          };
+          const ticket = await ticketModel.create(ticketData);
+          return ticket._id;
+        })
+      );
+
+      // Adicionar os tickets à reserva
+      savedBooking.tickets = tickets;
+      await savedBooking.save({ session });
 
       // Atualizar assentos
       sessionData.seats = sessionData.seats.map((row) =>
@@ -332,7 +360,28 @@ function bookingService(bookingModel) {
         };
 
         // Enviar o e-mail com o QR Code
-        await transporter.sendMail(mailOptions);
+        console.log('Configurações de email:', {
+          from: mailOptions.from,
+          to: mailOptions.to,
+          subject: mailOptions.subject
+        });
+        
+        try {
+          const info = await transporter.sendMail(mailOptions);
+          console.log('Email enviado com sucesso:', {
+            messageId: info.messageId,
+            response: info.response,
+            envelope: info.envelope
+          });
+        } catch (emailError) {
+          console.error('Erro detalhado ao enviar email:', {
+            code: emailError.code,
+            command: emailError.command,
+            response: emailError.response,
+            responseCode: emailError.responseCode,
+            stack: emailError.stack
+          });
+        }
 
         // Salvar a reserva atualizada com o status de pagamento
         await booking.save();
@@ -402,6 +451,9 @@ function bookingService(bookingModel) {
           ? product.discountedPrice
           : product.price;
 
+        console.log(`Is Discount Valid: ${isDiscountValid}`);
+        console.log(`Price to charge: ${applyPrice}`);
+
         // Verificar se o produto foi redimido com pontos, se sim, o preço é 0
         // caso contrário, o preço é o preço normal (ou com desconto) do produto
         const priceToCharge = item.redeemedWithPoints ? 0 : applyPrice;
@@ -448,14 +500,14 @@ function bookingService(bookingModel) {
           "card", // Cartão de crédito/débito
           "multibanco", // Para Multibanco (Portugal)
         ],
+        metadata: {
+          bookingId: booking._id.toString(),
+          userId: booking.user._id.toString(),
+          sessionId: booking.session._id.toString(),
+          movieId: session.movie._id.toString(),
+          roomId: session.room._id.toString(),
+        },
         payment_intent_data: {
-          metadata: {
-            bookingId: booking._id.toString(),
-            userId: booking.user._id.toString(),
-            sessionId: booking.session._id.toString(),
-            movieId: session.movie._id.toString(),
-            roomId: session.room._id.toString(),
-          },
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
@@ -824,7 +876,6 @@ function bookingService(bookingModel) {
       const paymentIntent = await stripe.paymentIntents.retrieve(
         booking.paymentIntentId
       );
-
       // Obter o ID da transação de saldo associada ao pagamento e obter o valor líquido
       const chargeId = paymentIntent.latest_charge;
       const charge = await stripe.charges.retrieve(chargeId);
