@@ -28,7 +28,22 @@ async function findAllBookings(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const result = await bookingService.findAll(page, limit);
+    const query = {};
+
+    // Adicionar filtros de consulta
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+    if (req.query.user) {
+      query.user = req.query.user;
+    }
+
+    if (req.query.session) {
+      query.session = req.query.session;
+    }
+
+
+    const result = await bookingService.findAll(page, limit, query);
     res.status(200).send(result);
   } catch (error) {
     next(error);

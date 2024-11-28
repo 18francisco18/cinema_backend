@@ -24,13 +24,15 @@ function MovieService(movieModel) {
     updateComment,
     deleteComment,
     deleteAllComments,
-    getAllComments
+    getAllComments,
   };
 
   async function create(movie) {
     try {
-
-      const findMovie = await movieModel.findOne({ title: movie.title, year: movie.year });
+      const findMovie = await movieModel.findOne({
+        title: movie.title,
+        year: movie.year,
+      });
       if (findMovie) {
         throw new ConflictError("Filme já existe no banco de dados");
       }
@@ -132,23 +134,36 @@ function MovieService(movieModel) {
     }
   }
 
-  // Função para buscar todos os filmes no banco de dados
-  async function findAll(page, limit) {
+  // Função para buscar todos os filmes no banco de dados com paginação, filtragem e ordenação
+  async function findAll(page = 1, limit = 10, query = {}, sort = {}) {
     try {
+      const skip = (page - 1) * limit;
+
+
+      // Buscar os filmes com filtros, paginação e ordenação
       const movies = await movieModel
-        .find()
-        .skip((page - 1) * limit)
-        .limit(limit);
-      const totalMovies = await movieModel.countDocuments();
+        .find(query)
+        .skip(skip)
+        .limit(limit)
+        .sort(sort);
+
+      const totalMovies = await movieModel.countDocuments(query);
+
+      const totalPages = Math.ceil(totalMovies / limit);
+
+      if (page > totalPages) {
+        return { movies: [], total: 0, page, limit };
+      }
+
       return {
         movies,
-        totalPages: Math.ceil(totalMovies / limit),
+        totalPages,
         currentPage: page,
         totalMovies,
       };
     } catch (err) {
-        console.log(err);
-        throw err;
+      console.log(err);
+      throw err;
     }
   }
 
@@ -174,7 +189,10 @@ function MovieService(movieModel) {
 
     try {
       // Verifica se o filme já está no banco de dados
-      const existingMovie = await movieModel.findOne({ title: title, year: year });
+      const existingMovie = await movieModel.findOne({
+        title: title,
+        year: year,
+      });
       if (existingMovie) {
         console.log(
           "Filme já existe no banco de dados, acedendo à base de dados..."
@@ -183,11 +201,7 @@ function MovieService(movieModel) {
       }
 
       // Chama o serviço que faz a requisição à OMDb API
-      const movie = await getMovieByTitleYearAndPlot(
-        title,
-        year,
-        plot
-      );
+      const movie = await getMovieByTitleYearAndPlot(title, year, plot);
 
       // Se não existir, salva no banco de dados
       const newMovie = await movieModel.create(movie);
@@ -207,7 +221,10 @@ function MovieService(movieModel) {
 
       // Check if user already commented on this movie
       const existingComment = movie.comments.find(
-        comment => comment.user && commentData.user && comment.user.toString() === commentData.user
+        (comment) =>
+          comment.user &&
+          commentData.user &&
+          comment.user.toString() === commentData.user
       );
       if (existingComment) {
         throw new ConflictError("Você já comentou neste filme");
@@ -215,51 +232,47 @@ function MovieService(movieModel) {
 
       movie.comments.push(commentData);
       await movie.save();
-      
+
       // Populate user data for the new comment
       const savedComment = movie.comments[movie.comments.length - 1];
       await movie.populate({
-        path: 'comments.user',
-        select: 'username name',
-        match: { _id: savedComment.user }
+        path: "comments.user",
+        select: "username name",
+        match: { _id: savedComment.user },
       });
-      
+
       const commentWithUsername = {
         ...savedComment.toObject(),
-        username: savedComment.user ? savedComment.user.username : 'Unknown User'
+        username: savedComment.user
+          ? savedComment.user.username
+          : "Unknown User",
       };
-      
+
       return commentWithUsername;
     } catch (error) {
-      if (error instanceof NotFoundError || error instanceof ConflictError) {
-        throw error;
-      }
-      throw new DatabaseError("Erro ao adicionar comentário");
+      throw error;
     }
   }
 
   async function getMovieComments(movieId) {
     try {
       const movie = await movieModel.findById(movieId).populate({
-        path: 'comments.user',
-        select: 'username name'
+        path: "comments.user",
+        select: "username name",
       });
       if (!movie) {
         throw new NotFoundError("Filme não encontrado");
       }
-      
+
       // Map comments to include username
-      const commentsWithUsername = movie.comments.map(comment => ({
+      const commentsWithUsername = movie.comments.map((comment) => ({
         ...comment.toObject(),
-        username: comment.user ? comment.user.username : 'Unknown User'
+        username: comment.user ? comment.user.username : "Unknown User",
       }));
-      
+
       return commentsWithUsername;
     } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      throw new DatabaseError("Erro ao buscar comentários");
+      throw error;
     }
   }
 
@@ -277,25 +290,22 @@ function MovieService(movieModel) {
 
       Object.assign(comment, updateData);
       await movie.save();
-      
+
       // Populate user data for the updated comment
       await movie.populate({
-        path: 'comments.user',
-        select: 'username name',
-        match: { _id: comment.user }
+        path: "comments.user",
+        select: "username name",
+        match: { _id: comment.user },
       });
-      
+
       const commentWithUsername = {
         ...comment.toObject(),
-        username: comment.user ? comment.user.username : 'Unknown User'
+        username: comment.user ? comment.user.username : "Unknown User",
       };
-      
+
       return commentWithUsername;
     } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      throw new DatabaseError("Erro ao atualizar comentário");
+      throw error;
     }
   }
 
@@ -308,9 +318,9 @@ function MovieService(movieModel) {
 
       // Find the comment index
       const commentIndex = movie.comments.findIndex(
-        comment => comment._id.toString() === commentId
+        (comment) => comment._id.toString() === commentId
       );
-      
+
       if (commentIndex === -1) {
         throw new NotFoundError("Comentário não encontrado");
       }
@@ -320,10 +330,7 @@ function MovieService(movieModel) {
       await movie.save();
       return true;
     } catch (error) {
-      if (error instanceof NotFoundError) {
-        throw error;
-      }
-      throw new DatabaseError("Erro ao deletar comentário");
+      throw error;
     }
   }
 
@@ -334,40 +341,61 @@ function MovieService(movieModel) {
         {}, // Match all documents
         { $set: { comments: [] } } // Set comments to empty array
       );
-      
+
       return {
         modifiedCount: result.modifiedCount,
-        message: `Comments deleted from ${result.modifiedCount} movies`
+        message: `Comments deleted from ${result.modifiedCount} movies`,
       };
     } catch (error) {
-      throw new DatabaseError("Error deleting all comments");
+      throw error;
     }
   }
 
-  async function getAllComments() {
+  // Função para buscar todos os comentários com paginação e filtragem por rating
+  async function getAllComments(page = 1, limit = 10, rating = null) {
     try {
+      const skip = (page - 1) * limit;
+
+      // Buscar os filmes e popular os comentários dos usuários
       const movies = await movieModel.find().populate({
-        path: 'comments.user',
-        select: 'username name'
+        path: "comments.user",
+        select: "username name",
       });
 
+      if (!movies) throw new NotFoundError("Nenhum filme encontrado");
+
       // Flatten all comments from all movies into a single array
-      const allComments = movies.reduce((comments, movie) => {
-        const movieComments = movie.comments.map(comment => ({
+      let allComments = movies.reduce((comments, movie) => {
+        const movieComments = movie.comments.map((comment) => ({
           ...comment.toObject(),
           movieTitle: movie.title,
           movieId: movie._id,
-          username: comment.user ? comment.user.username : 'Unknown User'
+          username: comment.user ? comment.user.username : "Unknown User",
         }));
         return [...comments, ...movieComments];
       }, []);
 
+      // Filtrar comentários por rating, se fornecido
+      if (rating !== null) {
+        allComments = allComments.filter(
+          (comment) => comment.rating === rating
+        );
+      }
+
       // Sort comments by date (newest first)
       allComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      return allComments;
+      // Paginação dos comentários
+      const paginatedComments = allComments.slice(skip, skip + limit);
+
+      return {
+        comments: paginatedComments,
+        total: allComments.length,
+        page: page,
+        pages: Math.ceil(allComments.length / limit),
+      };
     } catch (error) {
-      throw new DatabaseError("Erro ao buscar todos os comentários");
+      throw error;
     }
   }
 

@@ -35,7 +35,7 @@ function cinemaService(cinemaModel) {
       return await save(newCinema);
     } catch (error) {
       console.log(error);
-      throw (error);
+      throw error;
     }
   }
 
@@ -49,7 +49,7 @@ function cinemaService(cinemaModel) {
     });
   }
 
-  // Encontra todos os cinemas
+  // Encontra todos os cinemas com paginação e filtros
   async function findAll(page = 1, limit = 10) {
     try {
       const skip = (page - 1) * limit;
@@ -81,39 +81,45 @@ function cinemaService(cinemaModel) {
     try {
       const cinema = await cinemaModel.findById(id);
       if (!cinema) {
-        throw new NotFoundError("Cinema not found")
+        throw new NotFoundError("Cinema not found");
       }
 
       return cinema;
     } catch (error) {
       console.log(error);
-      throw error
+      throw error;
     }
   }
 
   // Atualiza um cinema pelo id
   async function findByIdAndUpdate(id, cinema) {
     try {
-      const updatedCinema = await cinemaModel.findByIdAndUpdate(id, cinema, { new: true });
+      const updatedCinema = await cinemaModel.findByIdAndUpdate(id, cinema, {
+        new: true,
+      });
       if (!updatedCinema) {
-        throw new NotFoundError("Cinema not found")
+        throw new NotFoundError("Cinema not found");
       }
       return updatedCinema;
     } catch (error) {
-      console.log(error)
-      throw error
+      console.log(error);
+      throw error;
     }
   }
 
-  // Encontra as salas de um cinema pelo id com paginação
-  async function findRoomsById(id, page = 1, limit = 10) {
+  // Encontra as salas de um cinema pelo id com paginação e filtros
+  async function findRoomsById(id, page = 1, limit = 10, query = {}) {
     try {
       // Calcular o número de documentos a serem ignorados
       const skip = (page - 1) * limit;
 
-      // Encontrar o cinema pelo id e popular as salas
+      // Adicionar o filtro para o cinema específico
+      query.cinema = id;
+
+      // Encontrar o cinema pelo id e popular as salas com filtros e paginação
       const cinema = await cinemaModel.findById(id).populate({
         path: "rooms",
+        match: query, // Aplicar os filtros
         options: {
           skip: skip,
           limit: limit,
@@ -124,8 +130,8 @@ function cinemaService(cinemaModel) {
         throw new NotFoundError("Cinema not found");
       }
 
-      // Contar o total de salas do cinema
-      const totalRooms = await Room.countDocuments({ cinema: id });
+      // Contar o total de salas do cinema com os filtros aplicados
+      const totalRooms = await Room.countDocuments(query);
 
       return {
         rooms: cinema.rooms,
@@ -134,8 +140,8 @@ function cinemaService(cinemaModel) {
         pages: Math.ceil(totalRooms / limit),
       };
     } catch (err) {
-      console.log(err)
-      throw err
+      console.log(err);
+      throw err;
     }
   }
 
@@ -179,7 +185,6 @@ function cinemaService(cinemaModel) {
       throw err;
     }
   }
-
 
   // Adiciona múltiplos filmes ao cartaz de um cinema (usando POST)
   async function addMovieToBillboard(id, movies) {
@@ -295,37 +300,39 @@ function cinemaService(cinemaModel) {
         let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
 
         if (movie) {
-          throw new ConflictError(`Movie with ID ${movieDetails.imdbID} already exists`);
+          throw new ConflictError(
+            `Movie with ID ${movieDetails.imdbID} already exists`
+          );
         }
 
         // Se o filme não existir, cria um novo
         if (!movie) {
           movie = new Movie({
-          title: movieDetails.title,
-          year: movieDetails.year,
-          rated: movieDetails.rated,
-          released: movieDetails.released,
-          runtime: movieDetails.runtime,
-          genre: movieDetails.genre,
-          director: movieDetails.director,
-          writer: movieDetails.writer,
-          actors: movieDetails.actors,
-          plot: movieDetails.plot,
-          language: movieDetails.language,
-          country: movieDetails.country,
-          awards: movieDetails.awards,
-          poster: movieDetails.poster,
-          ratings: movieDetails.ratings,
-          metascore: movieDetails.metascore,
-          imdbRating: movieDetails.imdbRating,
-          imdbVotes: movieDetails.imdbVotes,
-          imdbID: movieDetails.imdbID,
-          type: movieDetails.type,
-          dvd: movieDetails.dvd,
-          boxOffice: movieDetails.boxOffice,
-          production: movieDetails.production,
-          website: movieDetails.website,
-          response: movieDetails.response,
+            title: movieDetails.title,
+            year: movieDetails.year,
+            rated: movieDetails.rated,
+            released: movieDetails.released,
+            runtime: movieDetails.runtime,
+            genre: movieDetails.genre,
+            director: movieDetails.director,
+            writer: movieDetails.writer,
+            actors: movieDetails.actors,
+            plot: movieDetails.plot,
+            language: movieDetails.language,
+            country: movieDetails.country,
+            awards: movieDetails.awards,
+            poster: movieDetails.poster,
+            ratings: movieDetails.ratings,
+            metascore: movieDetails.metascore,
+            imdbRating: movieDetails.imdbRating,
+            imdbVotes: movieDetails.imdbVotes,
+            imdbID: movieDetails.imdbID,
+            type: movieDetails.type,
+            dvd: movieDetails.dvd,
+            boxOffice: movieDetails.boxOffice,
+            production: movieDetails.production,
+            website: movieDetails.website,
+            response: movieDetails.response,
           });
 
           await movie.save();
@@ -403,10 +410,31 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  // Busca todos os filmes de um cinema
-  async function getAllCinemaMovies(id) {
+  // Busca todos os filmes de um cinema com paginação, filtragem e ordenação
+  async function getAllCinemaMovies(
+    id,
+    page = 1,
+    limit = 10,
+    query = {},
+    sort = {}
+  ) {
     try {
-      const cinema = await cinemaModel.findById(id).populate("movies");
+      const skip = (page - 1) * limit;
+
+      // Adicionar o filtro para o cinema específico
+      query.cinema = id;
+
+      // Encontrar o cinema pelo id e popular os filmes com filtros, paginação e ordenação
+      const cinema = await cinemaModel.findById(id).populate({
+        path: "movies",
+        match: query, // Aplicar os filtros
+        options: {
+          skip: skip,
+          limit: limit,
+          sort: sort,
+        },
+      });
+
       if (!cinema) {
         throw new NotFoundError("Cinema not found");
       }
@@ -415,37 +443,30 @@ function cinemaService(cinemaModel) {
         throw new NotFoundError("No movies found in cinema");
       }
 
-      return cinema.movies;
+      // Contar o total de filmes do cinema com os filtros aplicados
+      const totalMovies = await Movie.countDocuments(query);
+
+      return {
+        movies: cinema.movies,
+        total: totalMovies,
+        page: page,
+        pages: Math.ceil(totalMovies / limit),
+      };
     } catch (err) {
       console.log(err);
       throw err;
     }
   }
 
-  async function getAllCinemaBillboards() {
+  async function getAllCinemaBillboards(req, res, next) {
     try {
-      const cinemas = await cinemaModel.find().populate("movies");
-      if (!cinemas || cinemas.length === 0) {
-        throw new NotFoundError("No cinemas found");
-      }
-
-      let allMovies = [];
-      cinemas.forEach(cinema => {
-        if (cinema.movies && cinema.movies.length > 0) {
-          allMovies = allMovies.concat(cinema.movies);
-        }
-      });
-
-      if (allMovies.length === 0) {
-        throw new NotFoundError("No movies found in any cinema");
-      }
-
-      return allMovies;
-    } catch (err) {
-      console.log(err);
-      throw err;
+      const billboards = await cinemaService.getAllCinemaBillboards();
+      res.status(200).send(billboards);
+    } catch (error) {
+      next(error);
     }
   }
+  
 
   return service;
 }
