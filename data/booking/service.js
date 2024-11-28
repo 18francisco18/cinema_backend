@@ -535,6 +535,8 @@ function bookingService(bookingModel) {
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
 
+      console.log("booking._id", booking._id);
+
       // Agendar a verificação de pagamento após 5 minutos
       checkingForPendingFiveMinutes(booking._id, paymentSession.payment_intent);
 

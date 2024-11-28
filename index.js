@@ -33,7 +33,7 @@ app.use(CORS({
 
 // Middleware para cookies e JSON
 app.use(cookieParser());
-app.use(express.json()); 
+
 
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
