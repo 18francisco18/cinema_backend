@@ -28,6 +28,12 @@ function MovieService(movieModel) {
 
   async function create(movie) {
     try {
+
+      const findMovie = await movieModel.findOne({ title: movie.title, year: movie.year });
+      if (findMovie) {
+        throw new ConflictError("Filme já existe no banco de dados");
+      }
+
       let newMovie = new movieModel(movie);
       let savedMovie = await newMovie.save();
       return savedMovie;
