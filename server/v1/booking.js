@@ -12,7 +12,7 @@ function BookingRouter() {
     "/webhook",
     bodyParser.raw({ type: "application/json" }),
     async (req, res) => {
-      console.log("Webhook received:", req.headers['stripe-signature']);
+      console.log("Webhook received:", req.headers["stripe-signature"]);
       const sig = req.headers["stripe-signature"];
       let event;
 
@@ -22,7 +22,7 @@ function BookingRouter() {
         event = stripe.webhooks.constructEvent(
           req.body,
           sig,
-          'whsec_49894f403ae008e3220781df6d0a615a89073ad9c0d1bece948eac064067208b'
+          process.env.STRIPE_WEBHOOK_SECRET
         );
         console.log("Webhook event type:", event.type);
       } catch (err) {
@@ -70,7 +70,7 @@ function BookingRouter() {
             amount: paymentIntent.amount,
             metadata: paymentIntent.metadata,
             bookingId: paymentIntent.metadata?.bookingId,
-            created: new Date(paymentIntent.created * 1000).toISOString()
+            created: new Date(paymentIntent.created * 1000).toISOString(),
           });
 
           try {
@@ -83,14 +83,11 @@ function BookingRouter() {
             );
             console.log("Payment confirmation handled successfully");
           } catch (error) {
-            console.error(
-              "Detailed error in payment confirmation:",
-              {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-              }
-            );
+            console.error("Detailed error in payment confirmation:", {
+              message: error.message,
+              stack: error.stack,
+              name: error.name,
+            });
             // Don't throw here - we want to acknowledge the webhook
           }
           break;
