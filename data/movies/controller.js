@@ -47,11 +47,33 @@ async function getMovieById(req, res, next) {
   }
 }
 
-// Controlador para obter todos os filmes
+// Controlador para obter todos os filmes com paginação, filtragem e ordenação
 async function getAllMovies(req, res, next) {
   try {
-    const movies = await movieService.findAll();
-    res.status(200).send(movies);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const query = {};
+    const sort = req.query.sort ? JSON.parse(req.query.sort) : {};
+
+    // Adicionar filtros de consulta
+    if (req.query.title) {
+      query.title = { $regex: req.query.title, $options: "i" }; // Filtro por título (case-insensitive)
+    }
+    if (req.query.genre) {
+      query.genre = { $regex: req.query.genre, $options: "i" }; // Filtro por gênero (case-insensitive)
+    }
+    if (req.query.rated) {
+      query.rated = { $regex: req.query.rated, $options: "i" }; // Filtro por classificação
+    }
+    if (req.query.director) {
+      query.director = { $regex: req.query.director, $options: "i" }; // Filtro por diretor
+    }
+    if (req.query.actors) {
+      query.actors = { $in: req.query.actors }; // Filtro por atores
+    }
+
+    const result = await movieService.findAll(page, limit, query, sort);
+    res.status(200).send(result);
   } catch (error) {
     console.log(error);
     next(error);
@@ -211,12 +233,16 @@ async function deleteAllComments(req, res, next) {
   }
 }
 
+// Controlador para buscar todos os comentários com paginação e filtragem por rating
 async function getAllComments(req, res, next) {
   try {
-    const comments = await movieService.getAllComments();
-    res.status(200).json(comments);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const rating = req.query.rating ? parseInt(req.query.rating) : null;
+
+    const result = await movieService.getAllComments(page, limit, rating);
+    res.status(200).send(result);
   } catch (error) {
-    console.error('Error getting all comments:', error);
     next(error);
   }
 }
