@@ -19,7 +19,8 @@ const movieController = {
   getComments,
   updateComment,
   deleteComment,
-  deleteAllComments
+  deleteAllComments,
+  getAllComments,
 };
 
 // Controlador para lidar com a busca de filmes
@@ -210,4 +211,25 @@ async function deleteAllComments(req, res, next) {
   }
 }
 
-module.exports = movieController;
+async function getAllComments(req, res, next) {
+  try {
+    const comments = await movieService.getAllComments();
+    res.status(200).json(comments);
+  } catch (error) {
+    console.error('Error getting all comments:', error);
+    next(error);
+  }
+}
+
+module.exports = {
+  searchMovie,
+  getMovieById,
+  getAllMovies,
+  removeMovie,
+  createComment,
+  getComments,
+  updateComment,
+  deleteComment,
+  deleteAllComments,
+  getAllComments
+};

@@ -24,6 +24,7 @@ function MoviesRouter() {
   
   // Rota administrativa para deletar todos os comentários
   router.delete("/comments/deleteAll", verifyToken, verifyAdmin, movieController.deleteAllComments);
+  router.get("/comments/all", verifyToken, verifyAdmin, movieController.getAllComments);
 
   return router;
 }

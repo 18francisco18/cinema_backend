@@ -23,7 +23,8 @@ function MovieService(movieModel) {
     getMovieComments,
     updateComment,
     deleteComment,
-    deleteAllComments
+    deleteAllComments,
+    getAllComments
   };
 
   async function create(movie) {
@@ -334,6 +335,33 @@ function MovieService(movieModel) {
       };
     } catch (error) {
       throw new DatabaseError("Error deleting all comments");
+    }
+  }
+
+  async function getAllComments() {
+    try {
+      const movies = await movieModel.find().populate({
+        path: 'comments.user',
+        select: 'username name'
+      });
+
+      // Flatten all comments from all movies into a single array
+      const allComments = movies.reduce((comments, movie) => {
+        const movieComments = movie.comments.map(comment => ({
+          ...comment.toObject(),
+          movieTitle: movie.title,
+          movieId: movie._id,
+          username: comment.user ? comment.user.username : 'Unknown User'
+        }));
+        return [...comments, ...movieComments];
+      }, []);
+
+      // Sort comments by date (newest first)
+      allComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      return allComments;
+    } catch (error) {
+      throw new DatabaseError("Erro ao buscar todos os comentários");
     }
   }
 
