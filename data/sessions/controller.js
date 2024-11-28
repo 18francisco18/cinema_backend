@@ -125,11 +125,12 @@ async function applyUnavaliabilityToSeats(req, res, next) {
 
 async function getSessionsReport(req, res, next) {
   try {
-    const { id } = req.params;
-    const sessionsReport = await sessionService.generateSessionReport(id);
-    res.status(200).json(sessionsReport);
+    const { sessionId } = req.params;
+    const report = await sessionService.generateSessionReport(sessionId);
+    res.status(200).json(report);
   } catch (error) {
-    next(error);
+    console.error('Erro ao gerar relatório de sessão:', error);
+    res.status(500).json({ error: 'Falha ao gerar relatório de sessão' });
   }
 }
 

@@ -18,6 +18,8 @@ function SessionsRouter() {
 
   router.post("/create", sessionsController.createSession);
   router.post("/checkAvailability", sessionsController.checkAvailability);
+
+  router.post("/:sessionId/generateReport", sessionsController.getSessionsReport);
   
   router.delete("/:id", sessionsController.deleteSession);
   

@@ -310,6 +310,55 @@ function bookingService(bookingModel) {
     }
   }
 
+  /*// Função para gerar um invoice de uma reserva ao criá-la
+  async function generateInvoice(booking) {
+    try {
+      // Buscar a sessão associada à reserva
+      const session = await sessionModel.findById(booking.session).populate("movie");
+
+      if (!session) {
+        throw new NotFoundError("Session not found");
+      }
+
+      // Calcular o total da reserva
+      let totalAmount = booking.seats.length * session.price;
+
+      // Adicionar o preço de cada produto ao total
+      for (const item of booking.products) {
+        if (!item.redeemedWithPoints) {
+          const product = await Product.findById(item.product);
+          if (!product) {
+            throw new NotFoundError(`Product not found: ${item.product}`);
+          }
+
+          // Adiciona o preço do produto multiplicado pela quantidade ao total
+          totalAmount += product.price * (item.quantity || 1);
+        }
+      }
+
+      // Criar o objeto de invoice
+      const invoice = {
+        bookingId: booking._id,
+        user: booking.user,
+        session: session._id,
+        movie: session.movie.title,
+        room: session.room.name,
+        cinema: session.room.cinema.name,
+        date: session.date,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        seats: booking.seats,
+        products: booking.products,
+        totalAmount,
+      };
+
+      return invoice;
+    } catch (error) {
+      console.error("Erro ao gerar invoice:", error);
+      throw error;
+    }
+  }*/
+
   // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
     try {

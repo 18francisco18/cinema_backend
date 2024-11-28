@@ -190,81 +190,81 @@ function cinemaService(cinemaModel) {
       if (!cinema) {
         throw new NotFoundError("Cinema not found");
       }
-
+  
       console.log("movies", movies);
-
+  
       // Array para armazenar os filmes a serem adicionados
       const moviesToAdd = [];
-
+  
+      // Verifique se `movies` é um array, se não for, transforme-o em um array
+      const moviesArray = Array.isArray(movies) ? movies : [movies];
+  
       // Para cada filme a ser adicionado
-      const title = movies.title;
-      const year = movies.year;
-      const plot = movies.plot;
+      for (let i = 0; i < moviesArray.length; i++) {
+        const { title, year, plot } = moviesArray[i];
+        
+        let movie = await Movie.findOne({ title: title });
 
-      // Busca os detalhes do filme pela API OMDb usando título e ano
-      const movieDetails = await movieService.getMovieByTitleYearAndPlot(
-        title,
-        year,
-        plot
-      );
+        if(movie) {
+          moviesToAdd.push(movie._id);
+          return moviesToAdd;
+        }
+  
+        if (!movie) {
+          // Busca os detalhes do filme pela API OMDb usando título e ano
+          const movieDetails = await movieService.getMovieByTitleYearAndPlot(title, year, plot);
 
-      if (!movieDetails) {
-        throw new NotFoundError("Movie not found");
+          if(!movieDetails) {
+            throw new NotFoundError("Movie not found");
+          }
+
+          movie = new Movie({
+            title: movieDetails.title,
+            year: movieDetails.year,
+            rated: movieDetails.rated,
+            released: movieDetails.released,
+            runtime: movieDetails.runtime,
+            genre: movieDetails.genre,
+            director: movieDetails.director,
+            writer: movieDetails.writer,
+            actors: movieDetails.actors,
+            plot: movieDetails.plot,
+            language: movieDetails.language,
+            country: movieDetails.country,
+            awards: movieDetails.awards,
+            poster: movieDetails.poster,
+            ratings: movieDetails.ratings,
+            metascore: movieDetails.metascore,
+            imdbRating: movieDetails.imdbRating,
+            imdbVotes: movieDetails.imdbVotes,
+            imdbID: movieDetails.imdbID,
+            type: movieDetails.type,
+            dvd: movieDetails.dvd,
+            boxOffice: movieDetails.boxOffice,
+            production: movieDetails.production,
+            website: movieDetails.website,
+            response: movieDetails.response,
+          });
+  
+          await movie.save();
+        }
+  
+        if (!cinema.movies.includes(movie._id)) {
+          moviesToAdd.push(movie._id);
+        }
       }
-
-      console.log("teste", movieDetails);
-
-      // Verifica se o filme já existe no banco de dados
-      let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
-
-      // Se o filme não existir, cria um novo
-      if (!movie) {
-        movie = new Movie({
-          title: movieDetails.title,
-          year: movieDetails.year,
-          rated: movieDetails.rated,
-          released: movieDetails.released,
-          runtime: movieDetails.runtime,
-          genre: movieDetails.genre,
-          director: movieDetails.director,
-          writer: movieDetails.writer,
-          actors: movieDetails.actors,
-          plot: movieDetails.plot,
-          language: movieDetails.language,
-          country: movieDetails.country,
-          awards: movieDetails.awards,
-          poster: movieDetails.poster,
-          ratings: movieDetails.ratings,
-          metascore: movieDetails.metascore,
-          imdbRating: movieDetails.imdbRating,
-          imdbVotes: movieDetails.imdbVotes,
-          imdbID: movieDetails.imdbID,
-          type: movieDetails.type,
-          dvd: movieDetails.dvd,
-          boxOffice: movieDetails.boxOffice,
-          production: movieDetails.production,
-          website: movieDetails.website,
-          response: movieDetails.response,
-        });
-
-        await movie.save();
-      }
-
-      // Adiciona o filme ao array de filmes a serem adicionados
-
-      if (!cinema.movies.includes(movie._id)) {
-        moviesToAdd.push(movie._id);
-      }
-
-      // Adiciona os filmes ao cartaz do cinema
+  
       cinema.movies.push(...moviesToAdd);
       await cinema.save();
       console.log("Updated cinema movies:", cinema.movies);
-
+  
       return cinema.movies;
     } catch (err) {
+      if (err.message === "Cinema not found" || err.message.startsWith("Movie with ID")) {
+        throw err;
+      }
       console.log(err);
-      throw err;
+      throw new Error("Erro ao adicionar filmes ao cinema");
     }
   }
 
@@ -280,54 +280,44 @@ function cinemaService(cinemaModel) {
         const year = movies[i].year;
         const plot = movies[i].plot;
 
-        // Busca os detalhes do filme pela API OMDb usando título e ano
-        const movieDetails = await movieService.getMovieByTitleYearAndPlot(
-          title,
-          year,
-          plot
-        );
-
-        if (!movieDetails) {
-          throw new NotFoundError("Movie not found");
-        }
-
-        // Verifica se o filme já existe no banco de dados
-        let movie = await Movie.findOne({ imdbID: movieDetails.imdbID });
-
-        if (movie) {
-          throw new ConflictError(`Movie with ID ${movieDetails.imdbID} already exists`);
-        }
-
-        // Se o filme não existir, cria um novo
+        let movie = await Movie.findOne({ title: title });
+  
         if (!movie) {
-          movie = new Movie({
-          title: movieDetails.title,
-          year: movieDetails.year,
-          rated: movieDetails.rated,
-          released: movieDetails.released,
-          runtime: movieDetails.runtime,
-          genre: movieDetails.genre,
-          director: movieDetails.director,
-          writer: movieDetails.writer,
-          actors: movieDetails.actors,
-          plot: movieDetails.plot,
-          language: movieDetails.language,
-          country: movieDetails.country,
-          awards: movieDetails.awards,
-          poster: movieDetails.poster,
-          ratings: movieDetails.ratings,
-          metascore: movieDetails.metascore,
-          imdbRating: movieDetails.imdbRating,
-          imdbVotes: movieDetails.imdbVotes,
-          imdbID: movieDetails.imdbID,
-          type: movieDetails.type,
-          dvd: movieDetails.dvd,
-          boxOffice: movieDetails.boxOffice,
-          production: movieDetails.production,
-          website: movieDetails.website,
-          response: movieDetails.response,
-          });
+          // Busca os detalhes do filme pela API OMDb usando título e ano
+          const movieDetails = await movieService.getMovieByTitleYearAndPlot(title, year, plot);
+          
+          if(!movieDetails) {
+            throw new NotFoundError("Movie not found");
+          }
 
+          movie = new Movie({
+            title: movieDetails.title,
+            year: movieDetails.year,
+            rated: movieDetails.rated,
+            released: movieDetails.released,
+            runtime: movieDetails.runtime,
+            genre: movieDetails.genre,
+            director: movieDetails.director,
+            writer: movieDetails.writer,
+            actors: movieDetails.actors,
+            plot: movieDetails.plot,
+            language: movieDetails.language,
+            country: movieDetails.country,
+            awards: movieDetails.awards,
+            poster: movieDetails.poster,
+            ratings: movieDetails.ratings,
+            metascore: movieDetails.metascore,
+            imdbRating: movieDetails.imdbRating,
+            imdbVotes: movieDetails.imdbVotes,
+            imdbID: movieDetails.imdbID,
+            type: movieDetails.type,
+            dvd: movieDetails.dvd,
+            boxOffice: movieDetails.boxOffice,
+            production: movieDetails.production,
+            website: movieDetails.website,
+            response: movieDetails.response,
+          });
+  
           await movie.save();
         }
 

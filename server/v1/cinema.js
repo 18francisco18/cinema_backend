@@ -21,11 +21,10 @@ function CinemaRouter() {
   router.put("/:id/update", cinemaController.updateCinemaById);
 
   router.post("/:id/addMoviesToBillboard", cinemaController.addMoviesToBillboard);
-  router.post("/:id/addMoviesToBillboard", cinemaController.addMoviesToBillboard);
   router.post("/create", cinemaController.createCinema);
   router.post("/addMoviesToAllBillboards", cinemaController.addMoviesToBillboards);
 
-  router.delete("/removeRoom/:id/:roomId", cinemaController.removeCinemaRoomById);
+  router.delete("/:id/removeRoom/:roomId", cinemaController.removeCinemaRoomById);
   router.delete("/remove/:id", cinemaController.removeCinemaById);
 
 

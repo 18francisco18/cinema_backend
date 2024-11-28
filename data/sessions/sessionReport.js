@@ -20,6 +20,8 @@ const sessionReportSchema = new Schema({
   cancellationAmountGenerated: { type: Number, required: true, default: 0 },
   totalAmountGenerated: { type: Number, required: true, default: 0 },
   seatsUnsold: { type: Number, required: true, default: 0 },
+  totalProductsSold: { type: Number, required: true, default: 0 },
+  totalProductsAmountGenerated: { type: Number, required: true, default: 0 },
   reportGeneratedAt: { type: Date, default: Date.now },
 });
 

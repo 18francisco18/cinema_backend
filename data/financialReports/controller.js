@@ -3,6 +3,7 @@ const financialReport = require('../financialReports');
 
 const financialReportController = {
     createInternalPaymentReport,
+    createSimplePaymentReport,
     /*findInternalPaymentReport,
     findInternalPaymentReports,*/
 }
@@ -10,6 +11,15 @@ const financialReportController = {
 async function createInternalPaymentReport(internalPaymentReport) {
   try {
     await financialReport.createInternalPaymentReport(internalPaymentReport);
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+}
+
+async function createSimplePaymentReport(simplePaymentReport) {
+  try {
+    await financialReport.createSimplePaymentReport(simplePaymentReport);
   } catch (error) {
     console.log(error);
     next(error);
