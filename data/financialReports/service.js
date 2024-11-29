@@ -2,12 +2,23 @@ const internalPaymentReport = require('./internalPaymentReport');
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
+const nodeMailer = require("nodemailer");
 const { ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, DatabaseError, ServiceUnavailableError } = require('../../AppError');
+
+const transporter = nodeMailer.createTransport({
+  service: "outlook",
+  auth: {
+    user: process.env.EMAIL_ADDRESS,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
+
 
 function financialReportsService(financialReportsModel) {
   let service = {
     createInternalPaymentReport,
     save,
+    createSimplePaymentReport,
     /*findAllInternalPaymentReports,
         findInternalPaymentReportById,*/
   };
@@ -153,6 +164,115 @@ function financialReportsService(financialReportsModel) {
         }
     }
         */
+
+    async function createSimplePaymentReport(simplePaymentReport) {
+        try {
+          const reportsPath = path.join(
+            "C:",
+            "Users",
+            "Asus",
+            "Desktop",
+            "relatorios_pagamentos"
+          );
+
+          // Verificar se a pasta 'relatorios_pagamentos' existe; caso contrário, criá-la
+          if (!fs.existsSync(reportsPath)) {
+            fs.mkdirSync(reportsPath, { recursive: true }); // 'recursive: true' para criar subdiretórios, se necessário
+          }
+
+          // Gerar o caminho completo para o arquivo PDF
+          const pdfPath = path.join(
+            reportsPath,
+            `payment_report_${simplePaymentReport.paymentId}.pdf`
+          );
+
+          // Criar o PDF do relatório
+          const doc = new PDFDocument();
+          const stream = fs.createWrite
+          Stream(pdfPath);
+
+          // Adicionar conteúdo ao PDF
+          doc.pipe(stream);
+          doc.fontSize(25).text("Relatório de Pagamento", { align: "center" });
+          doc.moveDown();
+
+          // Informações do Relatório
+          doc
+            .fontSize(14)
+            .text(`ID do Pagamento:`, { continued: true, underline: true })
+            .text(` ${simplePaymentReport.paymentId}`, { underline: false });
+          doc.moveDown(0.5);
+
+          doc
+            .fontSize(14)
+            .text(`Nome do Cliente:`, { continued: true, underline: true })
+            .text(` ${simplePaymentReport.customerName}`, {
+              underline: false,
+            });
+          doc.moveDown(0.5);
+
+          doc
+            .fontSize(14)
+            .text(`Email do Cliente:`, { continued: true, underline: true })
+            .text(` ${simplePaymentReport.customerEmail}`, {
+              underline: false,
+            });
+          doc.moveDown(0.5);
+
+          doc
+            .fontSize(14)
+            .text(`Valor:`, { continued: true, underline: true })
+            .text(
+              ` ${
+                simplePaymentReport.amount
+              } ${simplePaymentReport.currency.toUpperCase()}`,
+              { underline: false }
+            );
+          doc.moveDown(0.5);
+
+          doc
+            .fontSize(14)
+            .text(`Método de Pagamento:`, { continued: true, underline: true })
+            .text(` ${simplePaymentReport.paymentMethod}`, {
+              underline: false,
+            });
+          doc.moveDown(0.5);
+
+          doc
+            .fontSize(14)
+            .text(`Data de Criação:`, { continued: true, underline: true })
+            .text(` ${simplePaymentReport.created_at.toLocaleDateString()}`, {
+              underline: false,
+            });
+          doc.moveDown(0.5);
+
+          // Rodapé
+          doc.moveDown(2);
+          doc.fontSize(10).text("Este é um relatório gerado automaticamente.", {
+            align: "center",
+            italic: true,
+          });
+
+          doc.end();
+
+          // Esperar o stream do PDF terminar antes de continuar
+          await new Promise((resolve, reject) => {
+            stream.on("finish", resolve);
+            stream.on("error", reject);
+          });
+
+          console.log(`PDF gerado e salvo em: ${pdfPath}`);
+
+          let newSimplePaymentReport = new financialReportsModel(
+            simplePaymentReport
+          );
+          return await save(newSimplePaymentReport);
+
+        } catch (error) {
+            console.log(error);
+            throw new DatabaseError(`Error creating simple payment report`);
+        }
+    }
 
   return service;
 }

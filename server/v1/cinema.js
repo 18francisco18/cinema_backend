@@ -24,7 +24,7 @@ function CinemaRouter() {
   router.post("/create", cinemaController.createCinema);
   router.post("/addMoviesToAllBillboards", cinemaController.addMoviesToBillboards);
 
-  router.delete("/removeRoom/:id/:roomId", cinemaController.removeCinemaRoomById);
+  router.delete("/:id/removeRoom/:roomId", cinemaController.removeCinemaRoomById);
   router.delete("/remove/:id", cinemaController.removeCinemaById);
 
 

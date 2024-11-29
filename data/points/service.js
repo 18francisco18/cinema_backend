@@ -21,19 +21,18 @@ function pointsService(pointsModel) {
 
   async function addProductToPointSystem(product) {
     try {
-
       console.log(product);
 
-    const productRef = await Product.findById(product.product);
-    if (!productRef) throw new NotFoundError("Produto não encontrado");
+      const productRef = await Product.findById(product.product);
+      if (!productRef) throw new NotFoundError("Produto não encontrado");
 
-    const points = await pointsModel.create(product);
-    productRef.pointsRef = points._id;
-    await Promise.all([
-      productRef.save(),
-      points.save(),
-    ]);
-    return points;
+      const points = await pointsModel.create(product);
+      productRef.pointsRef = points._id;
+      await Promise.all([
+        productRef.save(),
+        points.save(),
+      ]);
+      return points;
   } catch (err) {
     console.log(err);
     throw err;

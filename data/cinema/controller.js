@@ -28,16 +28,27 @@ async function createCinema(req, res, next) {
     }
 }
 
-// Controlador para buscar todos os cinemas.
 async function findAllCinemas(req, res, next) {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const cinemas = await cinemaService.findAll(page, limit);
-        res.status(200).send(cinemas);
-    } catch (error) {
-        next(error)
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const query = {};
+
+    // Adicionar filtros de consulta
+    if (req.query.name) {
+      query.name = { $regex: req.query.name, $options: "i" }; // Filtro por nome (case-insensitive)
     }
+    if (req.query.address) {
+      query.address = { $regex: req.query.address, $options: "i" }; // Filtro por endereço (case-insensitive)
+    }
+    if (req.query.movies) {
+        query.movies = { $in: req.query.movies }; // Filtro por filmes em cartaz
+    }
+    const result = await cinemaService.findAll(page, limit, query);
+    res.status(200).send(result);
+  } catch (error) {
+    next(error);
+  }
 }
 
 // Controlador para buscar um cinema pelo seu id.
@@ -64,17 +75,27 @@ async function updateCinemaById(req, res, next) {
     }
 }
 
-// Controlador para buscar as salas de um cinema pelo seu id.
-async function findCinemaRoomsById (req, res, next) {
-    try {
-        const { id } = req.params;
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const room = await cinemaService.findRoomsById(id, page, limit);
-        res.status(200).send(room);
-    } catch (error) {
-        next(error)
+// Controlador para buscar as salas de um cinema pelo seu id
+async function findCinemaRoomsById(req, res, next) {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const query = {};
+
+    // Adicionar filtros de consulta
+    if (req.query.name) {
+      query.name = { $regex: req.query.name, $options: "i" }; // Filtro por nome (case-insensitive)
     }
+    if (req.query.capacity) {
+      query.capacity = parseInt(req.query.capacity); // Filtro por capacidade
+    }
+
+    const result = await cinemaService.findRoomsById(id, page, limit, query);
+    res.status(200).send(result);
+  } catch (error) {
+    next(error);
+  }
 }
 
 // Retira uma sala de um cinema, não elimina.
@@ -144,24 +165,81 @@ async function removeMovieFromBillboards(req, res, next) {
     }
 }
 
+// Controlador para buscar todos os filmes de um cinema com paginação, filtragem e ordenação
 async function getAllCinemaMovies(req, res, next) {
-    try {
-        const { id } = req.params;
-        const movies = await cinemaService.getAllCinemaMovies(id);
-        res.status(200).send(movies);
-    } catch (error) {
-        next(error)
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const query = {};
+    const sort = req.query.sort ? JSON.parse(req.query.sort) : {};
+
+    // Adicionar filtros de consulta
+    if (req.query.title) {
+      query.title = { $regex: req.query.title, $options: "i" }; // Filtro por título (case-insensitive)
     }
+    if (req.query.genre) {
+      query.genre = { $regex: req.query.genre, $options: "i" }; // Filtro por gênero (case-insensitive)
+    }
+    if (req.query.year) {
+      query.year = parseInt(req.query.year); // Filtro por ano
+    }
+
+    if (req.query.rated) {
+      query.rated = { $regex: req.query.rated, $options: "i" }; // Filtro por classificação
+    }
+
+    if (req.query.director) {
+      query.director = { $regex: req.query.director, $options: "i" }; // Filtro por diretor
+    }
+
+    if (req.query.actors) {
+        query.actors = { $in: req.query.actors }; // Filtro por atores
+    }
+
+    const result = await cinemaService.getAllCinemaMovies(id, page, limit, query, sort);
+    res.status(200).send(result);
+  } catch (error) {
+    next(error);
+  }
 }
 
+// Controlador para buscar todos os filmes de todos os cinemas com paginação, filtragem e ordenação
 async function getAllCinemaBillboards(req, res, next) {
-    try {
-        const { id } = req.params;
-        const billboards = await cinemaService.getAllCinemaBillboards();
-        res.status(200).send(billboards);
-    } catch (error) {
-        next(error)
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const query = {};
+    const sort = req.query.sort ? JSON.parse(req.query.sort) : {};
+
+    // Adicionar filtros de consulta
+    if (req.query.title) {
+      query.title = { $regex: req.query.title, $options: "i" }; // Filtro por título (case-insensitive)
     }
+    if (req.query.genre) {
+      query.genre = { $regex: req.query.genre, $options: "i" }; // Filtro por gênero (case-insensitive)
+    }
+    if (req.query.year) {
+      query.year = parseInt(req.query.year); // Filtro por ano
+    }
+
+    if (req.query.rated) {
+      query.rated = { $regex: req.query.rated, $options: "i" }; // Filtro por classificação
+    }
+
+    if (req.query.director) {
+      query.director = { $regex: req.query.director, $options: "i" }; // Filtro por diretor
+    }
+
+    if (req.query.actors) {
+      query.actors = { $in: req.query.actors }; // Filtro por atores
+    }
+
+    const result = await cinemaService.getAllCinemaBillboards(page, limit, query, sort);
+    res.status(200).send(result);
+  } catch (error) {
+    next(error);
+  }
 }
 
 

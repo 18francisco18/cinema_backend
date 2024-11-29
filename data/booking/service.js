@@ -28,21 +28,21 @@ const {
 dotenv.config();
 
 const transporter = nodeMailer.createTransport({
-  service: 'Outlook365',
+  service: "Outlook365",
   auth: {
     user: process.env.EMAIL_ADDRESS,
-    pass: process.env.EMAIL_PASSWORD
+    pass: process.env.EMAIL_PASSWORD,
   },
   debug: true, // Ativa logs detalhados
-  logger: true // Ativa logs do transporter
+  logger: true, // Ativa logs do transporter
 });
 
 // Verificar a conexão do transporter
-transporter.verify(function(error, success) {
+transporter.verify(function (error, success) {
   if (error) {
-    console.error('Erro na verificação do transporter:', error);
+    console.error("Erro na verificação do transporter:", error);
   } else {
-    console.log('Servidor pronto para enviar emails');
+    console.log("Servidor pronto para enviar emails");
   }
 });
 
@@ -187,7 +187,7 @@ function bookingService(bookingModel) {
           const ticketData = {
             booking: savedBooking._id,
             seat: seat,
-            status: "booked"
+            status: "booked",
           };
           const ticket = await ticketModel.create(ticketData);
           return ticket._id;
@@ -236,19 +236,23 @@ function bookingService(bookingModel) {
 
   // Função para verificar se o pagamento está pendente após 5 minutos
   async function checkingForPendingFiveMinutes(bookingId, paymentIntentId) {
-    console.log("Scheduling booking deletion in 5 minutes");
+    console.log(`[Cleanup] Scheduling cleanup for booking ${bookingId} in 5 minutes`);
     try {
       setTimeout(async () => {
         try {
+          console.log(`[Cleanup] Checking booking ${bookingId} after 5 minutes`);
           const booking = await bookingModel
             .findById(bookingId)
             .populate("products.product");
           if (!booking) {
-            throw new NotFoundError("Booking not found");
+            console.log(`[Cleanup] Booking ${bookingId} not found`);
+            return;
           }
 
+          console.log(`[Cleanup] Current booking status: ${booking.paymentStatus}`);
           // Verificar se o status do pagamento é "pending"
           if (booking.paymentStatus === "pending") {
+            console.log(`[Cleanup] Booking ${bookingId} is still pending after 5 minutes, initiating cleanup`);
             // Cancelar o PaymentIntent associado
             if (paymentIntentId) {
               await cancelPaymentIntent(paymentIntentId);
@@ -272,7 +276,7 @@ function bookingService(bookingModel) {
 
               // Salvar os pontos atualizados do usuário
               await user.save();
-              console.log("Points refunded to user");
+              console.log(`[Cleanup] Points refunded to user`);
             }
 
             // Atualização do status dos assentos reservados
@@ -287,56 +291,119 @@ function bookingService(bookingModel) {
                 })
               );
               await session.save();
-              console.log("Seats status updated to available");
+              console.log(`[Cleanup] Seats status updated to available`);
             }
 
             // Remover a reserva do banco de dados
             await removeById(bookingId);
-            console.log("Booking deleted and PaymentIntent canceled");
+            console.log(`[Cleanup] Booking ${bookingId} deleted and PaymentIntent canceled`);
           }
         } catch (error) {
-          console.error("Error deleting booking:", error);
+          console.error(`[Cleanup] Error deleting booking ${bookingId}:`, error);
         }
       }, 5 * 60 * 1000); // 5 minutos em milissegundos
 
       return { message: "Booking deletion scheduled in 5 minutes" };
     } catch (error) {
-      console.error("Error scheduling booking deletion:", error);
+      console.error(`[Cleanup] Error scheduling booking deletion ${bookingId}:`, error);
       throw error;
     }
   }
 
+  /*// Função para gerar um invoice de uma reserva ao criá-la
+  async function generateInvoice(booking) {
+    try {
+      // Buscar a sessão associada à reserva
+      const session = await sessionModel.findById(booking.session).populate("movie");
+
+      if (!session) {
+        throw new NotFoundError("Session not found");
+      }
+
+      // Calcular o total da reserva
+      let totalAmount = booking.seats.length * session.price;
+
+      // Adicionar o preço de cada produto ao total
+      for (const item of booking.products) {
+        if (!item.redeemedWithPoints) {
+          const product = await Product.findById(item.product);
+          if (!product) {
+            throw new NotFoundError(`Product not found: ${item.product}`);
+          }
+
+          // Adiciona o preço do produto multiplicado pela quantidade ao total
+          totalAmount += product.price * (item.quantity || 1);
+        }
+      }
+
+      // Criar o objeto de invoice
+      const invoice = {
+        bookingId: booking._id,
+        user: booking.user,
+        session: session._id,
+        movie: session.movie.title,
+        room: session.room.name,
+        cinema: session.room.cinema.name,
+        date: session.date,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        seats: booking.seats,
+        products: booking.products,
+        totalAmount,
+      };
+
+      return invoice;
+    } catch (error) {
+      console.error("Erro ao gerar invoice:", error);
+      throw error;
+    }
+  }*/
+
   // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
-      // Buscar a sessão de pagamento no Stripe usando o sessionId
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId.id
-      );
+      console.log("Starting payment confirmation process...");
+      console.log("PaymentIntentId received:", paymentIntentId);
+
+      // Buscar a sessão de pagamento no Stripe usando o ID
+      console.log("Retrieving payment intent from Stripe...");
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      console.log("Payment Intent details:", {
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        metadata: paymentIntent.metadata,
+        amount: paymentIntent.amount,
+      });
+
       if (!paymentIntent) {
+        console.error("Payment Intent not found");
         throw new NotFoundError("Payment Intent não encontrado");
       }
 
       // Verificar se o pagamento foi realizado com sucesso
+      console.log("Checking payment status:", paymentIntent.status);
       if (paymentIntent.status === "succeeded") {
-        const bookingId = paymentIntent.metadata
-          ? paymentIntent.metadata.bookingId
-          : null;
+        const bookingId = paymentIntent.metadata?.bookingId;
+        console.log("BookingId from metadata:", bookingId);
 
         // Buscar a reserva com o ID fornecido
+        console.log("Finding booking in database...");
         const booking = await bookingModel.findById(bookingId).populate("user");
         if (!booking) {
+          console.error("Booking not found for ID:", bookingId);
           throw new NotFoundError("Booking not found");
         }
+        console.log("Current booking status:", booking.paymentStatus);
 
         // Atualizar o status de pagamento para "paid"
         booking.paymentStatus = "paid";
+        await booking.save();
+        console.log("Updated booking status to:", booking.paymentStatus);
 
         // Recompensar o utilizador com pontos com base no valor do pagamento
-        await userModel.findByIdAndUpdate(
-          booking.user._id,
-          { $inc: { points: paymentIntent.amount_received } } // Incrementa pontos ao utilizador
-        );
+        await userModel.findByIdAndUpdate(booking.user._id, {
+          $inc: { points: Math.floor(paymentIntent.amount_received / 100) },
+        });
 
         // Gerar o QR Code usando a função existente
         const qrCode = await generateQRCode(booking);
@@ -360,31 +427,35 @@ function bookingService(bookingModel) {
         };
 
         // Enviar o e-mail com o QR Code
-        console.log('Configurações de email:', {
+        console.log("Configurações de email:", {
           from: mailOptions.from,
           to: mailOptions.to,
-          subject: mailOptions.subject
+          subject: mailOptions.subject,
         });
-        
+
         try {
           const info = await transporter.sendMail(mailOptions);
-          console.log('Email enviado com sucesso:', {
+          console.log("Email enviado com sucesso:", {
             messageId: info.messageId,
             response: info.response,
-            envelope: info.envelope
+            envelope: info.envelope,
           });
         } catch (emailError) {
-          console.error('Erro detalhado ao enviar email:', {
+          console.error("Erro detalhado ao enviar email:", {
             code: emailError.code,
             command: emailError.command,
             response: emailError.response,
             responseCode: emailError.responseCode,
-            stack: emailError.stack
+            stack: emailError.stack,
           });
         }
 
         // Salvar a reserva atualizada com o status de pagamento
-        await booking.save();
+        const savedBooking = await booking.save();
+        console.log(
+          "Booking atualizado com sucesso:",
+          savedBooking.paymentStatus
+        );
 
         // Formatar um relatório de pagamento interno
         const report = {
@@ -400,12 +471,10 @@ function bookingService(bookingModel) {
         // Criar um relatório de pagamento interno
         await financialReportController.createInternalPaymentReport(report);
 
-        return { message: "Payment confirmed, QR Code sent", booking };
-      } else {
-        throw new PaymentRequiredError("Payment not confirmed");
+        return savedBooking;
       }
     } catch (error) {
-      console.error("Error confirming payment:", error);
+      console.error("Erro em handlePaymentConfirmation:", error);
       throw error;
     }
   }
@@ -434,13 +503,13 @@ function bookingService(bookingModel) {
       // Adicionar cada objeto da array de produtos em booking ao line_items
       for (const item of booking.products) {
         const product = await Product.findById(item.product._id);
-        if (!product) throw new NotFoundError(`Product not found: ${item.product._id}`);
+        if (!product)
+          throw new NotFoundError(`Product not found: ${item.product._id}`);
 
         console.log(`Product ID: ${product}`);
         console.log(`Discounted Price: ${product.discountedPrice}`);
         console.log(`Discount Expiration: ${product.discountExpiration}`);
         console.log(`Current Date: ${new Date()}`);
-
 
         // Verificar se o desconto é válido
         const isDiscountValid =
@@ -500,20 +569,22 @@ function bookingService(bookingModel) {
           "card", // Cartão de crédito/débito
           "multibanco", // Para Multibanco (Portugal)
         ],
-        metadata: {
-          bookingId: booking._id.toString(),
-          userId: booking.user._id.toString(),
-          sessionId: booking.session._id.toString(),
-          movieId: session.movie._id.toString(),
-          roomId: session.room._id.toString(),
-        },
         payment_intent_data: {
+          metadata: {
+            bookingId: booking._id.toString(),
+            userId: booking.user._id.toString(),
+            sessionId: booking.session._id.toString(),
+            movieId: session.movie._id.toString(),
+            roomId: session.room._id.toString(),
+          },
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
         cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
         line_items: line_items,
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
+
+      console.log("booking._id", booking._id);
 
       // Agendar a verificação de pagamento após 5 minutos
       checkingForPendingFiveMinutes(booking._id, paymentSession.payment_intent);
@@ -651,12 +722,11 @@ function bookingService(bookingModel) {
     }
   }
 
-  // Encontra todas as reservas com paginação
-  async function findAll(page = 1, limit = 10) {
+  async function findAll(page = 1, limit = 10, query = {}) {
     try {
       const skip = (page - 1) * limit;
-      const bookings = await bookingModel.find().skip(skip).limit(limit);
-      const total = await bookingModel.countDocuments();
+      const bookings = await bookingModel.find(query).skip(skip).limit(limit);
+      const total = await bookingModel.countDocuments(query);
 
       if (bookings.length === 0) {
         throw new NotFoundError("No bookings found.");

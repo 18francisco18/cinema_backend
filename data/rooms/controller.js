@@ -32,13 +32,23 @@ async function getRoomById(req, res, next) {
   }
 }
 
-// Controlador para buscar todas as salas
+// Controlador para buscar todas as salas com paginação e filtragem
 async function getAllRooms(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const rooms = await roomService.findAll(page, limit);
-    res.status(200).send(rooms);
+    const filters = {};
+
+    // Adicionar filtros de consulta
+    if (req.query.name) {
+      filters.name = { $regex: req.query.name, $options: "i" }; // Filtro por nome (case-insensitive)
+    }
+    if (req.query.capacity) {
+      filters.capacity = parseInt(req.query.capacity); // Filtro por capacidade
+    }
+
+    const result = await roomService.findAll(page, limit, filters);
+    res.status(200).send(result);
   } catch (error) {
     console.log(error);
     next(error);

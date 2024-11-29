@@ -1,6 +1,7 @@
 let mongoose = require("mongoose");
 let Schema = mongoose.Schema;
 let seatStatus = require("./seatStatus");
+const sessionsController = require("../sessions/controller");
 
 const seatSchema = new Schema({
   number: { type: String, required: true, unique: true },
@@ -16,6 +17,7 @@ let roomSchema = new Schema({
   capacity: { type: Number, required: true },
   layout: [[seatSchema]],
   cinema: { type: Schema.Types.ObjectId, ref: "Cinema", required: true },
+  sessions: [{ type: Schema.Types.ObjectId, ref: "Session" }],
 });
 
 roomSchema.pre("save", function (next) {

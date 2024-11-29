@@ -12,16 +12,19 @@ function BookingRouter() {
     "/webhook",
     bodyParser.raw({ type: "application/json" }),
     async (req, res) => {
+      console.log("Webhook received:", req.headers["stripe-signature"]);
       const sig = req.headers["stripe-signature"];
       let event;
 
       try {
+        console.log("Constructing Stripe event...");
         // Verificar a assinatura e decodificar o evento enviado pelo Stripe
         event = stripe.webhooks.constructEvent(
           req.body,
           sig,
           process.env.STRIPE_WEBHOOK_SECRET
         );
+        console.log("Webhook event type:", event.type);
       } catch (err) {
         console.error("Erro ao verificar assinatura do webhook:", err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -61,8 +64,32 @@ function BookingRouter() {
 
         case "payment_intent.succeeded":
           const paymentIntent = event.data.object;
-          console.log("Pagamento confirmado para:", paymentIntent.id);
-          await bookingController.handlePaymentConfirmation(paymentIntent);
+          console.log("Payment Intent Succeeded - Full Details:", {
+            id: paymentIntent.id,
+            status: paymentIntent.status,
+            amount: paymentIntent.amount,
+            metadata: paymentIntent.metadata,
+            bookingId: paymentIntent.metadata?.bookingId,
+            created: new Date(paymentIntent.created * 1000).toISOString(),
+          });
+
+          try {
+            console.log("Initiating payment confirmation handling...");
+            // Handle payment confirmation through the service which will update status
+            // and handle all necessary side effects (emails, QR codes, etc)
+            await bookingController.handlePaymentConfirmation(
+              paymentIntent.id,
+              null
+            );
+            console.log("Payment confirmation handled successfully");
+          } catch (error) {
+            console.error("Detailed error in payment confirmation:", {
+              message: error.message,
+              stack: error.stack,
+              name: error.name,
+            });
+            // Don't throw here - we want to acknowledge the webhook
+          }
           break;
 
         case "charge.updated":
@@ -75,6 +102,7 @@ function BookingRouter() {
       }
 
       // Retornar uma resposta para confirmar o recebimento do evento
+      console.log("Sending webhook response");
       res.json({ received: true });
     }
   );
@@ -84,21 +112,23 @@ function BookingRouter() {
   router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
   // Outras rotas normais
-
   router.get("/find/:id", bookingController.getBookingById);
   router.get("/findAll", bookingController.findAllBookings);
-  router.get("/:sessionId/findAll", bookingController.findAllBookingsForSession);
+  router.get(
+    "/:sessionId/findAll",
+    bookingController.findAllBookingsForSession
+  );
 
   router.put("/update/:id", bookingController.updateBookingById);
 
   router.post("/:id/create", bookingController.createBooking);
   router.post("/:id/cancelReservation", bookingController.cancelReservation);
-  router.post("/:bookingId/refundTickets", bookingController.refundTicketsFromBooking);
-  
+  router.post(
+    "/:bookingId/refundTickets",
+    bookingController.refundTicketsFromBooking
+  );
+
   router.delete("/remove/:id", bookingController.removeBookingById);
-  
-  
-  
 
   return router;
 }

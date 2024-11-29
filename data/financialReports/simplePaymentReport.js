@@ -10,3 +10,7 @@ const simplePaymentReport = new Schema({
     amountPaid: { type: Number, required: true },
     currency : { type: String, default: "eur" },
 });
+
+const SimplePaymentReport = mongoose.model('SimplePaymentReport', simplePaymentReport);
+
+module.exports = SimplePaymentReport;
