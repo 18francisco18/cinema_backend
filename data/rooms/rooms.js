@@ -12,10 +12,34 @@ const seatSchema = new Schema({
   },
 });
 
+// Função para gerar o layout padrão
+const generateDefaultLayout = (totalSeats = 60) => {
+  const rows = Math.ceil(totalSeats / 8); // Número de filas
+  const layout = [];
+  let seatNumber = 1;
+
+  for (let i = 0; i < rows; i++) {
+    const row = [];
+    const rowLetter = String.fromCharCode(65 + i); // Converte o índice da fila para uma letra (A, B, C, ...)
+    for (let j = 0; j < 8; j++) {
+      if (seatNumber <= totalSeats) {
+        row.push({
+          number: `${rowLetter}${j + 1}`, // Formato do número do assento (ex: A1, A2, ...)
+          status: seatStatus.inCondition,
+        });
+        seatNumber++;
+      }
+    }
+    layout.push(row);
+  }
+
+  return layout;
+};
+
 let roomSchema = new Schema({
   name: { type: String, required: true },
   capacity: { type: Number, required: true },
-  layout: [[seatSchema]],
+  layout: { type: [[seatSchema]], default: generateDefaultLayout },
   cinema: { type: Schema.Types.ObjectId, ref: "Cinema", required: true },
   sessions: [{ type: Schema.Types.ObjectId, ref: "Session" }],
 });
