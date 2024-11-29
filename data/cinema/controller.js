@@ -123,9 +123,11 @@ async function removeCinemaById(req, res, next) {
 // Controlador para adicionar filmes ao cartaz de um cinema.
 async function addMoviesToBillboard(req, res, next) {
     try {
+        console.log(req.params);
         const { id } = req.params;
+        const { movieId } = req.params;
         const { movies } = req.body;
-        const cinema = await cinemaService.addMovieToBillboard(id, movies);
+        const cinema = await cinemaService.addMovieToBillboard(id, movies, movieId);
         res.status(200).send(cinema);
     } catch (error) {
         next(error);
