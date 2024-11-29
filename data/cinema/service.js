@@ -187,11 +187,12 @@ function cinemaService(cinemaModel) {
   }
 
   // Adiciona múltiplos filmes ao cartaz de um cinema (usando POST)
-  async function addMovieToBillboard(id, movies) {
+  async function addMovieToBillboard(id, movies, movieId) {
     console.log("Searching Movie");
     try {
       // Encontra o cinema pelo id
       const cinema = await cinemaModel.findById(id);
+      console.log("Cinema: ", id);
       if (!cinema) {
         throw new NotFoundError("Cinema not found");
       }
@@ -208,7 +209,7 @@ function cinemaService(cinemaModel) {
       for (let i = 0; i < moviesArray.length; i++) {
         const { title, year, plot } = moviesArray[i];
         
-        let movie = await Movie.findOne({ title: title });
+        let movie = await Movie.findById(movieId);
 
         if(movie) {
           moviesToAdd.push(movie._id);
