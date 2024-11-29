@@ -11,6 +11,7 @@ const sessionsController = {
     checkAndUpdateSessions,
     applyUnavaliabilityToSeats,
     getSessionsReport,
+    getAllSessionReports,
 }
 
 // Controlador para criar uma nova sessão
@@ -131,6 +132,23 @@ async function getSessionsReport(req, res, next) {
   } catch (error) {
     console.error('Erro ao gerar relatório de sessão:', error);
     res.status(500).json({ error: 'Falha ao gerar relatório de sessão' });
+  }
+}
+
+// Controlador para buscar todos os relatórios de sessão com paginação e filtros
+async function getAllSessionReports(req, res, next) {
+  try {
+    console.log('Buscando todos os relatórios de sessão...');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+
+    
+
+    const result = await sessionService.getAllSessionReports(page, limit);
+    res.status(200).json(result);
+  } catch (error) {
+    next(error);
   }
 }
 

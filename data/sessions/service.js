@@ -30,6 +30,7 @@ function sessionService(sessionModel) {
     deleteSessions,
     applyUnavailabilityToSeats,
     generateSessionReport,
+    getAllSessionReports,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -62,8 +63,6 @@ function sessionService(sessionModel) {
       }
 
       // Acessar o layout de assentos da Room e mapear para a Session
-      // Para cada objeto "row", mapear cada objeto "seat" e retornar
-      // um objeto com o número do assento e o estado inicial
       const seatLayout = room.layout.map((row) => {
         return row.map((seat) => ({
           seat: seat.number,
@@ -87,6 +86,11 @@ function sessionService(sessionModel) {
 
       // Salvar a nova sessão no banco de dados
       await session.save();
+
+      // Adicionar o ID da sessão ao array "sessions" na Room
+      room.sessions.push(session._id);
+      await room.save();
+
       return session;
     } catch (error) {
       console.error(error);
@@ -103,9 +107,9 @@ function sessionService(sessionModel) {
       const sessions = await Session.find(query)
         .skip(skip)
         .limit(limit)
-        .populate('room', 'name')  // Popula apenas o nome da sala
-        .populate('movie', 'title')  // Popula apenas o título do filme
-        .sort({ date: 1, startTime: 1 });  // Ordena por data e hora
+        .populate("room", "name") // Popula apenas o nome da sala
+        .populate("movie", "title") // Popula apenas o título do filme
+        .sort({ date: 1, startTime: 1 }); // Ordena por data e hora
       const total = await Session.countDocuments(query);
       const totalPages = Math.ceil(total / limit);
 
@@ -132,21 +136,25 @@ function sessionService(sessionModel) {
   async function findByMovie(movieId, page = 1, limit = 10) {
     try {
       const skip = (page - 1) * limit;
-      
+
       const sessions = await Session.find({ movie: movieId })
         .skip(skip)
         .limit(limit)
-        .populate('room', 'name')
-        .populate('movie', 'title')
+        .populate("room", "name")
+        .populate("movie", "title")
         .sort({ date: 1, startTime: 1 });
 
       const total = await Session.countDocuments({ movie: movieId });
       const totalPages = Math.ceil(total / limit);
 
-      if (!sessions) throw new DatabaseError("Error finding sessions for movie");
-      if (sessions.length === 0) throw new NotFoundError("No sessions found for this movie");
+      if (!sessions)
+        throw new DatabaseError("Error finding sessions for movie");
+      if (sessions.length === 0)
+        throw new NotFoundError("No sessions found for this movie");
       if (page > totalPages) {
-        throw new ValidationError(`Invalid page. Total pages available: ${totalPages}`);
+        throw new ValidationError(
+          `Invalid page. Total pages available: ${totalPages}`
+        );
       }
 
       return {
@@ -155,8 +163,8 @@ function sessionService(sessionModel) {
           total,
           totalPages,
           currentPage: page,
-          limit
-        }
+          limit,
+        },
       };
     } catch (error) {
       console.error(error);
@@ -180,8 +188,8 @@ function sessionService(sessionModel) {
   async function findById(sessionId) {
     try {
       const session = await Session.findById(sessionId)
-        .populate('movie', 'title poster')
-        .populate('room', 'name capacity');
+        .populate("movie", "title poster")
+        .populate("room", "name capacity");
 
       if (!session) {
         throw new NotFoundError("Session not found");
@@ -192,22 +200,26 @@ function sessionService(sessionModel) {
         const totalSeats = session.room.capacity;
         const rows = Math.ceil(Math.sqrt(totalSeats));
         const seatsPerRow = Math.ceil(totalSeats / rows);
-        
+
         const seats = [];
         let seatNumber = 1;
-        
+
         for (let row = 0; row < rows; row++) {
           const rowSeats = [];
-          for (let col = 0; col < seatsPerRow && seatNumber <= totalSeats; col++) {
+          for (
+            let col = 0;
+            col < seatsPerRow && seatNumber <= totalSeats;
+            col++
+          ) {
             rowSeats.push({
               seat: `${String.fromCharCode(65 + row)}${col + 1}`,
-              status: 'available'
+              status: "available",
             });
             seatNumber++;
           }
           seats.push(rowSeats);
         }
-        
+
         session.seats = seats;
         await session.save();
       }
@@ -301,7 +313,7 @@ function sessionService(sessionModel) {
       const currentTime = new Date();
 
       // Atualiza sessões finalizadas
-      await Session.updateMany(
+      const updatedSession = await Session.updateMany(
         // Se endTime for menor que a hora atual ($lt - lesser than) e status diferente de "finished" ou "cancelled" ($nin - not in)
         // então atualiza o status para "finished" ($set - set field)
         {
@@ -310,6 +322,11 @@ function sessionService(sessionModel) {
         },
         { $set: { status: sessionStatus.finished } }
       );
+
+      // Gerar relatório de sessão para cada sessão finalizada
+      for (let i = 0; i < updatedSession.n; i++) {
+        await generateSessionReport(updatedSession[i]._id);
+      }
 
       // Atualiza sessões em progresso
       // Se startTime for menor que a hora atual ($lt - lesser than) e endTime for maior que a hora atual ($gt - greater than)
@@ -332,16 +349,55 @@ function sessionService(sessionModel) {
     }
   }
 
+  // Função para buscar todos os relatórios de sessão com paginação e filtros
+  async function getAllSessionReports(page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Buscar relatórios de sessão com filtros e paginação
+      const reports = await sessionReport.find().skip(skip).limit(limit);
+
+
+      if (reports.length === 0) {
+        return {
+          reports: [],
+          totalReports: 0,
+          totalPages: 0,
+          currentPage: page,
+          limit,
+        };
+      }
+
+      const totalReports = await sessionReport.countDocuments(filters);
+      const totalPages = Math.ceil(totalReports / limit);
+
+      return {
+        reports,
+        totalReports,
+        totalPages,
+        currentPage: page,
+        limit,
+      };
+    } catch (error) {
+      console.error("Erro ao buscar relatórios de sessão", error);
+      throw error;
+    }
+  }
+
   // Função para aplicar indisponibilidade a assentos específicos de uma sessão
   async function applyUnavailabilityToSeats(sessionId, seatNumbers) {
     try {
       let session = await sessionModel.findById(sessionId);
       if (!session) throw new NotFoundError("Session not found");
-      if(session.status === sessionStatus.finished || session.status === sessionStatus.cancelled) {
-        throw new ValidationError("Cannot apply unavailability to seats for a finished or cancelled session");
+      if (
+        session.status === sessionStatus.finished ||
+        session.status === sessionStatus.cancelled
+      ) {
+        throw new ValidationError(
+          "Cannot apply unavailability to seats for a finished or cancelled session"
+        );
       }
 
-      
       // Obter o layout de assentos da sessão
       const seatLayout = session.seats;
 
@@ -361,8 +417,6 @@ function sessionService(sessionModel) {
         }
       });
 
-
-
       // Atualizar o layout de assentos da sessão
       session.seats = seatLayout;
       await session.save();
@@ -379,17 +433,19 @@ function sessionService(sessionModel) {
       if (!session) {
         throw new Error("Session not found");
       }
-  
+
       // Buscar as reservas associadas à sessão
       let bookings = await booking.find({ session: sessionId });
       if (!bookings || bookings.length === 0) {
         throw new Error("Bookings not found");
       }
-  
+
       // Obter os bilhetes vendidos para a sessão
-      let tickets = await ticketModel.find({ booking: { $in: bookings.map(booking => booking._id) } });
+      let tickets = await ticketModel.find({
+        booking: { $in: bookings.map((booking) => booking._id) },
+      });
       console.log(tickets);
-  
+
       // Calcular o total de bilhetes vendidos
       const ticketsSold = tickets.reduce((count, ticket) => {
         if (ticket.status === "booked") {
@@ -397,46 +453,69 @@ function sessionService(sessionModel) {
         }
         return count;
       }, 0);
-  
+
       // Calcular o total de bilhetes vendidos para todas as sessões
       const totalTicketsSold = await ticketModel.countDocuments();
-  
+
       // Calcular o total de cancelamentos
-      const cancellationsTotal = tickets.filter(ticket => ticket.status === "cancelled").length;
-  
+      const cancellationsTotal = tickets.filter(
+        (ticket) => ticket.status === "cancelled"
+      ).length;
+
       // Calcular o total de cancelamentos por período
       const cancellationsPeriods = {
-        before2Hours: tickets.filter(ticket => (ticket.status === "cancelled" || ticket.status === "refunded") && ticket.cancelledAt && (ticket.cancelledAt.getTime() - session.startTime.getTime() > 2 * 60 * 60 * 1000)).length,
-        between2HoursAnd30Minutes: tickets.filter(ticket => (ticket.status === "cancelled" || ticket.status === "refunded") && ticket.cancelledAt && (ticket.cancelledAt.getTime() - session.startTime.getTime() <= 2 * 60 * 60 * 1000 && ticket.cancelledAt.getTime() - session.startTime.getTime() > 30 * 60 * 1000)).length,
-        after30Minutes: tickets.filter(ticket => (ticket.status === "cancelled" || ticket.status === "refunded") && ticket.cancelledAt && (ticket.cancelledAt.getTime() - session.startTime.getTime() <= 30 * 60 * 1000)).length,
+        before2Hours: tickets.filter(
+          (ticket) =>
+            (ticket.status === "cancelled" || ticket.status === "refunded") &&
+            ticket.cancelledAt &&
+            ticket.cancelledAt.getTime() - session.startTime.getTime() >
+              2 * 60 * 60 * 1000
+        ).length,
+        between2HoursAnd30Minutes: tickets.filter(
+          (ticket) =>
+            (ticket.status === "cancelled" || ticket.status === "refunded") &&
+            ticket.cancelledAt &&
+            ticket.cancelledAt.getTime() - session.startTime.getTime() <=
+              2 * 60 * 60 * 1000 &&
+            ticket.cancelledAt.getTime() - session.startTime.getTime() >
+              30 * 60 * 1000
+        ).length,
+        after30Minutes: tickets.filter(
+          (ticket) =>
+            (ticket.status === "cancelled" || ticket.status === "refunded") &&
+            ticket.cancelledAt &&
+            ticket.cancelledAt.getTime() - session.startTime.getTime() <=
+              30 * 60 * 1000
+        ).length,
       };
-  
+
       // Calcular o montante total gerado com bilhetes
       const ticketAmountGenerated = ticketsSold * session.price;
-  
+
       // Calcular o montante total gerado com cancelamentos
       const cancellationAmountGenerated = cancellationsTotal * session.price;
-  
+
       // Calcular o montante total gerado
-      const totalAmountGenerated = ticketAmountGenerated - cancellationAmountGenerated;
+      const totalAmountGenerated =
+        ticketAmountGenerated - cancellationAmountGenerated;
 
       // Calcular o valor total dos produtos vendidos nas reservas da sessão
       const totalProductsSold = bookings.reduce((total, booking) => {
         return total + booking.products.length;
-      }
-      , 0);
+      }, 0);
 
       // Calcular o valor total dos produtos vendidos em todas as reservas da sessão
       const totalProductsAmountGenerated = await booking.aggregate([
         { $match: { session: session._id } },
         { $unwind: "$products" },
-        { $group: { _id: null, total: { $sum: "$products.price" } } }
+        { $group: { _id: null, total: { $sum: "$products.price" } } },
       ]);
-      
-  
+
       // Calcular o total de assentos não vendidos
-      const seatsUnsold = session.seats.flat().filter(seat => seat.status === "available").length;
-  
+      const seatsUnsold = session.seats
+        .flat()
+        .filter((seat) => seat.status === "available").length;
+
       // Criar um novo relatório de sessão com os dados calculados
       const newSessionReport = new sessionReport({
         sessionId: sessionId,
@@ -454,23 +533,21 @@ function sessionService(sessionModel) {
       });
 
       console.log(newSessionReport);
-  
+
       // Salvar o relatório de sessão no banco de dados
       await newSessionReport.save();
-  
+
       return newSessionReport;
-  
     } catch (error) {
       console.log(error);
-  
+
       if (error.message === "Session not found") {
         throw new Error("Session not found");
       }
-  
+
       throw new Error(`Error generating session report: ${error.message}`);
     }
   }
-  
 
   return service;
 }
