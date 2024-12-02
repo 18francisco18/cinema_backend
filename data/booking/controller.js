@@ -100,12 +100,12 @@ async function updateBookingById(req, res, next) {
 }
 
 
-async function handlePaymentConfirmation(paymentIntentId, next) {
+async function handlePaymentConfirmation(paymentIntentId) {
     try {
         await bookingService.handlePaymentConfirmation(paymentIntentId);
     } catch (error) {
         console.error("Erro ao confirmar pagamento:", error.message);
-        next(error);
+        throw error;
     }
 }
 

@@ -6,7 +6,6 @@ const financialReportController = require("../financialReports/controller");
 const QRCode = require("qrcode");
 const seatStatus = require("../sessions/seatStatus");
 const sessionStatus = require("../sessions/sessionStatus");
-const nodeMailer = require("nodemailer");
 const dotenv = require("dotenv");
 const Session = require("../sessions/sessions");
 const Product = require("../products/product");
@@ -24,27 +23,9 @@ const {
   ServiceUnavailableError,
   PaymentRequiredError,
 } = require("../../AppError");
+const fs = require('fs').promises;
 
 dotenv.config();
-
-const transporter = nodeMailer.createTransport({
-  service: "Outlook365",
-  auth: {
-    user: process.env.EMAIL_ADDRESS,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-  debug: true, // Ativa logs detalhados
-  logger: true, // Ativa logs do transporter
-});
-
-// Verificar a conexão do transporter
-transporter.verify(function (error, success) {
-  if (error) {
-    console.error("Erro na verificação do transporter:", error);
-  } else {
-    console.log("Servidor pronto para enviar emails");
-  }
-});
 
 function bookingService(bookingModel) {
   let service = {
@@ -319,7 +300,7 @@ function bookingService(bookingModel) {
         name: user.name,
         email: user.email,
         metadata: {
-          userId: user._id,
+          userId: user._id.toString(), // Convertendo para string
         },
       });
 
@@ -336,7 +317,7 @@ function bookingService(bookingModel) {
 
   // Função para gerar um invoice de uma reserva ao criá-la
   async function generateInvoice(booking) {
-    try{
+    try {
       const user = await userModel.findById(booking.user);
       if (!user) {
         throw new NotFoundError("User not found");
@@ -347,26 +328,17 @@ function bookingService(bookingModel) {
         const customer = await createStripeCustomer(user);
         user.stripeCustomerId = customer.id;
         await user.save();
-
         console.log("Customer created:", customer);
 
         // Criar um invoice para a reserva
         const invoice = await stripe.invoices.create({
-          bookingId: booking._id,
-          user: booking.user.stripeCustomerId,
-          session: Session._id,
-          movie: Session.movie.title,
-          cinema: Session.room.cinema.name,
-          seats: booking.seats,
-          products: booking.products,
-          totalAmount: booking.totalAmount,
           customer: customer.id,
           auto_advance: true,
           collection_method: "send_invoice",
           days_until_due: 30,
           metadata: {
-            bookingId: booking._id,
-            userId: user._id,
+            bookingId: booking._id.toString(),
+            userId: user._id.toString(),
           },
         });
 
@@ -374,33 +346,19 @@ function bookingService(bookingModel) {
       } else {
         // Criar um invoice para a reserva
         const invoice = await stripe.invoices.create({
-          bookingId: booking._id,
-          user: booking.user.stripeCustomerId,
-          session: Session._id,
-          movie: Session.movie.title,
-          room: Session.room.name,
-          cinema: Session.room.cinema.name,
-          date: Session.date,
-          startTime: Session.startTime,
-          endTime: Session.endTime,
-          seats: booking.seats,
-          products: booking.products,
-          totalAmount: booking.totalAmount,
           customer: user.stripeCustomerId,
           auto_advance: true,
           collection_method: "send_invoice",
           days_until_due: 30,
           metadata: {
-            bookingId: booking._id,
-            userId: user._id,
+            bookingId: booking._id.toString(),
+            userId: user._id.toString(),
           },
         });
 
         console.log("Invoice created:", invoice);
-
         return invoice;
       }
-
     } catch (error) {
       console.error("Erro ao gerar fatura:", error);
       throw error;
@@ -408,122 +366,84 @@ function bookingService(bookingModel) {
   }
 
   // Função que lida com o após o pagamento ser confirmado.
-  async function handlePaymentConfirmation(paymentIntentId) {
+  async function handlePaymentConfirmation(bookingId) {
     try {
       console.log("Starting payment confirmation process...");
-      console.log("PaymentIntentId received:", paymentIntentId);
+      console.log("BookingId received:", bookingId);
 
-      // Buscar a sessão de pagamento no Stripe usando o ID
-      console.log("Retrieving payment intent from Stripe...");
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log("Payment Intent details:", {
-        id: paymentIntent.id,
-        status: paymentIntent.status,
-        metadata: paymentIntent.metadata,
-        amount: paymentIntent.amount,
+      // Buscar a reserva com o ID fornecido
+      console.log("Finding booking in database...");
+      const booking = await bookingModel
+        .findById(bookingId)
+        .populate("user")
+        .populate({
+          path: "session",
+          populate: {
+            path: "movie",
+            select: "title"
+          }
+        })
+        .select("+paymentIntentId"); // Garantir que o paymentIntentId seja incluído
+
+      if (!booking) {
+        console.error("Booking not found for ID:", bookingId);
+        throw new NotFoundError("Booking not found");
+      }
+      console.log("Current booking status:", booking.paymentStatus);
+
+      // Atualizar o status de pagamento para "paid"
+      booking.paymentStatus = "paid";
+      await booking.save();
+      console.log("Updated booking status to:", booking.paymentStatus);
+
+      // Recompensar o utilizador com pontos com base no valor total da reserva
+      await userModel.findByIdAndUpdate(booking.user._id, {
+        $inc: { points: Math.floor(booking.totalAmount) },
       });
 
-      if (!paymentIntent) {
-        console.error("Payment Intent not found");
-        throw new NotFoundError("Payment Intent não encontrado");
-      }
+      // Gerar o QR Code usando a função existente
+      const qrCode = await generateQRCode(booking);
 
-      // Verificar se o pagamento foi realizado com sucesso
-      console.log("Checking payment status:", paymentIntent.status);
-      if (paymentIntent.status === "succeeded") {
-        const bookingId = paymentIntent.metadata?.bookingId;
-        console.log("BookingId from metadata:", bookingId);
+      // Aguardar um momento para garantir que o webhook do Stripe atualizou o paymentIntentId
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Buscar a reserva com o ID fornecido
-        console.log("Finding booking in database...");
-        const booking = await bookingModel.findById(bookingId).populate("user");
-        if (!booking) {
-          console.error("Booking not found for ID:", bookingId);
-          throw new NotFoundError("Booking not found");
-        }
-        console.log("Current booking status:", booking.paymentStatus);
+      // Buscar a reserva atualizada com o paymentIntentId
+      const updatedBooking = await bookingModel
+        .findById(bookingId)
+        .populate("user")
+        .select("+paymentIntentId");
 
-        // Atualizar o status de pagamento para "paid"
-        booking.paymentStatus = "paid";
-        await booking.save();
-        console.log("Updated booking status to:", booking.paymentStatus);
-
-        // Recompensar o utilizador com pontos com base no valor do pagamento
-        await userModel.findByIdAndUpdate(booking.user._id, {
-          $inc: { points: Math.floor(paymentIntent.amount_received / 100) },
-        });
-
-        // Gerar o QR Code usando a função existente
-        const qrCode = await generateQRCode(booking);
-
-        // Configurar as opções de e-mail para enviar o QR Code
-        const mailOptions = {
-          from: process.env.EMAIL_ADDRESS,
-          to: booking.user.email,
-          subject: "Your Movie Booking - QR Codes",
-          text: `Your booking is confirmed for ${booking.seats.length} seat(s). Please find your QR Code attached.`,
-          html: `
-          <p>Dear ${booking.user.name},</p>
-          <p>Thank you for booking your tickets! Here are the details:</p>
-          <ul>
-            <li><strong>Seats:</strong> ${booking.seats.join(", ")}</li>
-          </ul>
-          <p>Please use the QR code below for entry:</p>
-          <img src="${qrCode}" alt="QR Code" />
-          <p>Enjoy your movie!</p>
-        `,
-        };
-
-        // Enviar o e-mail com o QR Code
-        console.log("Configurações de email:", {
-          from: mailOptions.from,
-          to: mailOptions.to,
-          subject: mailOptions.subject,
-        });
-
-        try {
-          const info = await transporter.sendMail(mailOptions);
-          console.log("Email enviado com sucesso:", {
-            messageId: info.messageId,
-            response: info.response,
-            envelope: info.envelope,
-          });
-        } catch (emailError) {
-          console.error("Erro detalhado ao enviar email:", {
-            code: emailError.code,
-            command: emailError.command,
-            response: emailError.response,
-            responseCode: emailError.responseCode,
-            stack: emailError.stack,
-          });
-        }
-
-        // Salvar a reserva atualizada com o status de pagamento
-        const savedBooking = await booking.save();
-        console.log(
-          "Booking atualizado com sucesso:",
-          savedBooking.paymentStatus
-        );
-
-        // Formatar um relatório de pagamento interno
-        const report = {
-          paymentId: paymentIntent.id,
+      // Criar um relatório de pagamento interno (sem enviar por email)
+      try {
+        await financialReportController.createInternalPaymentReport({
+          paymentId: booking.paymentIntentId || updatedBooking.paymentIntentId,
           customerName: booking.user.name,
           customerEmail: booking.user.email,
-          amount: paymentIntent.amount_received / 100,
-          currency: paymentIntent.currency,
-          paymentMethod: paymentIntent.payment_method_types[0],
-          created_at: new Date(paymentIntent.created * 1000),
-        };
-
-        // Criar um relatório de pagamento interno
-        await financialReportController.createInternalPaymentReport(report);
-
-        // Gerar um invoice para a reserva
-        const invoice = await generateInvoice(savedBooking);
-
-        return savedBooking, invoice;
+          amount: booking.totalAmount,
+          currency: "eur",
+          paymentMethod: "card",
+          created_at: new Date(),
+        });
+      } catch (error) {
+        console.error('Erro ao gerar relatório:', error);
+        // Não vamos falhar a transação se o relatório falhar
       }
+
+      // Enviar email com o QR Code
+      try {
+        const { sendBookingConfirmationEmail } = require('../../services/emailService');
+        await sendBookingConfirmationEmail(booking, qrCode);
+        console.log('Email de confirmação enviado com sucesso');
+      } catch (emailError) {
+        console.error('Erro ao enviar email de confirmação:', emailError);
+        // Não vamos falhar a transação se o email falhar
+        // O usuário ainda pode ver o QR code na área do cliente
+      }
+
+      // Gerar um invoice para a reserva
+      const invoice = await generateInvoice(booking);
+
+      return booking;
     } catch (error) {
       console.error("Erro em handlePaymentConfirmation:", error);
       throw error;
@@ -624,11 +544,11 @@ function bookingService(bookingModel) {
         ],
         payment_intent_data: {
           metadata: {
-            bookingId: booking._id.toString(),
-            userId: booking.user._id.toString(),
-            sessionId: booking.session._id.toString(),
-            movieId: session.movie._id.toString(),
-            roomId: session.room._id.toString(),
+            bookingId: booking._id.toString(), // Convertendo para string
+            userId: booking.user._id.toString(), // Convertendo para string
+            sessionId: booking.session._id.toString(), // Convertendo para string
+            movieId: session.movie._id.toString(), // Convertendo para string
+            roomId: session.room._id.toString(), // Convertendo para string
           },
         },
         success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
@@ -687,7 +607,7 @@ function bookingService(bookingModel) {
       // Dados que serão codificados no QR Code para cada bilhete
       const qrData = {
         qrCodeId,
-        bookingId: populatedBooking._id, // ID da reserva associada
+        bookingId: populatedBooking._id.toString(), // Convertendo para string
         tickets: tickets.map((ticket) => ({ ticketId: ticket._id })), // Lista de IDs de bilhetes
         products: populatedBooking.products.map((product) => ({
           productId: product._id,
