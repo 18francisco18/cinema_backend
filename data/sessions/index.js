@@ -1,5 +1,5 @@
 const Session = require('./sessions');
-const SessionsService = require('./service');
+const SessionService = require('./service');
 
-const sessionService = SessionsService(Session);
+const sessionService = SessionService(Session);
 module.exports = sessionService;

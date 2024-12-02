@@ -17,9 +17,9 @@ const {
   ServiceUnavailableError,
 } = require("../../AppError");
 
-function sessionService(sessionModel) {
+function SessionService(sessionModel) {
   let service = {
-    create,
+    createSession,
     findAll,
     findByMovie,
     deleteSession,
@@ -38,7 +38,7 @@ function sessionService(sessionModel) {
   // dos ids de Room e Movie e garantir a cópia dos assentos de uma sala antes de criar a Session.
   // Não só serve para garantir a integridade dos dados e evitar erros de referência, como também
   // aplicar mais facilmente restrições no processo de criação.
-  async function create(roomId, movieId, date, price, startTime, endTime) {
+  async function createSession(roomId, movieId, date, price, startTime, endTime) {
     try {
       // Buscar o layout da Room pelo ID
       const room = await Room.findById(roomId);
@@ -350,14 +350,13 @@ function sessionService(sessionModel) {
   }
 
   // Função para buscar todos os relatórios de sessão com paginação e filtros
-  async function getAllSessionReports(page = 1, limit = 10) {
+  async function getAllSessionReports(page = 1, limit = 10, filters = {}) {
     try {
       const skip = (page - 1) * limit;
-
+  
       // Buscar relatórios de sessão com filtros e paginação
-      const reports = await sessionReport.find().skip(skip).limit(limit);
-
-
+      const reports = await sessionReport.find(filters).skip(skip).limit(limit);
+  
       if (reports.length === 0) {
         return {
           reports: [],
@@ -367,10 +366,10 @@ function sessionService(sessionModel) {
           limit,
         };
       }
-
+  
       const totalReports = await sessionReport.countDocuments(filters);
       const totalPages = Math.ceil(totalReports / limit);
-
+  
       return {
         reports,
         totalReports,
@@ -552,4 +551,4 @@ function sessionService(sessionModel) {
   return service;
 }
 
-module.exports = sessionService;
+module.exports = SessionService;

@@ -1,7 +1,6 @@
 let mongoose = require("mongoose");
 let Schema = mongoose.Schema;
 let seatStatus = require("./seatStatus");
-const sessionsController = require("../sessions/controller");
 
 const seatSchema = new Schema({
   number: { type: String, required: true, unique: true },

@@ -28,6 +28,7 @@ let userSchema = new Schema({
       ref: "Merchandise",
     },
   ], 
+  stripeCustomerId: { type: String, required: false },
 });
 
 let User = mongoose.model("User", userSchema);

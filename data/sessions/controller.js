@@ -1,7 +1,7 @@
 const sessionService = require('../sessions');
 
 const sessionsController = {
-    createSession,
+    generateSession,
     cancelSession,
     getSessions,
     getSessionById,
@@ -15,12 +15,12 @@ const sessionsController = {
 }
 
 // Controlador para criar uma nova sessão
-async function createSession(req, res, next) {
+async function generateSession(req, res, next) {
   try {
     const { room, movie, date, price, startTime, endTime } = req.body;
 
     // Chamar o serviço para criar uma sessão com os dados fornecidos
-    const session = await sessionService.create(room, movie, date, price, startTime, endTime);
+    const session = await sessionService.createSession(room, movie, date, price, startTime, endTime);
 
     // Se a sessão foi criada com sucesso, retornar a sessão criada
     res.status(201).json({
@@ -62,6 +62,7 @@ async function getSessionById(req, res, next) {
   try {
     const { id } = req.params;
     const session = await sessionService.findById(id);
+    console.log(session);
     res.status(200).json(session);
   } catch (error) {
     next(error);

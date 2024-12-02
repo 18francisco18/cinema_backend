@@ -17,7 +17,7 @@ function SessionsRouter() {
   router.put("/:id/cancelSession", sessionsController.cancelSession);
   router.put("/:id/applyUnavailability", sessionsController.applyUnavaliabilityToSeats);
 
-  router.post("/create", sessionsController.createSession);
+  router.post("/create", sessionsController.generateSession);
   router.post("/checkAvailability", sessionsController.checkAvailability);
 
   router.post("/:sessionId/generate-report", sessionsController.getSessionsReport);

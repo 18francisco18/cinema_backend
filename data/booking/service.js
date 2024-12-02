@@ -161,13 +161,15 @@ function bookingService(bookingModel) {
       // Calcular o total
       let totalAmount = booking.seats.length * sessionData.price;
 
-      // Adicionar o preço de cada produto ao total
-      for (const item of booking.products) {
-        if (!item.redeemedWithPoints) {
-          const product = await Product.findById(item.product).session(session);
+      // Adicionar o preço de cada produto ao total, se houver produtos
+      if (booking.products && booking.products.length > 0) {
+        for (const item of booking.products) {
+          if (!item.redeemedWithPoints) {
+            const product = await Product.findById(item.product).session(session);
 
-          // Adiciona o preço do produto multiplicado pela quantidade ao total
-          totalAmount += product.price * (item.quantity || 1);
+            // Adiciona o preço do produto multiplicado pela quantidade ao total
+            totalAmount += product.price * (item.quantity || 1);
+          }
         }
       }
 
@@ -310,54 +312,100 @@ function bookingService(bookingModel) {
     }
   }
 
-  /*// Função para gerar um invoice de uma reserva ao criá-la
-  async function generateInvoice(booking) {
+  // Criar um stripe customer para gerar um invoice
+  async function createStripeCustomer(user) {
     try {
-      // Buscar a sessão associada à reserva
-      const session = await sessionModel.findById(booking.session).populate("movie");
+      const customer = await stripe.customers.create({
+        name: user.name,
+        email: user.email,
+        metadata: {
+          userId: user._id,
+        },
+      });
 
-      if (!session) {
-        throw new NotFoundError("Session not found");
+      if (!customer) {
+        throw new ServiceUnavailableError("Failed to create customer");
       }
 
-      // Calcular o total da reserva
-      let totalAmount = booking.seats.length * session.price;
-
-      // Adicionar o preço de cada produto ao total
-      for (const item of booking.products) {
-        if (!item.redeemedWithPoints) {
-          const product = await Product.findById(item.product);
-          if (!product) {
-            throw new NotFoundError(`Product not found: ${item.product}`);
-          }
-
-          // Adiciona o preço do produto multiplicado pela quantidade ao total
-          totalAmount += product.price * (item.quantity || 1);
-        }
-      }
-
-      // Criar o objeto de invoice
-      const invoice = {
-        bookingId: booking._id,
-        user: booking.user,
-        session: session._id,
-        movie: session.movie.title,
-        room: session.room.name,
-        cinema: session.room.cinema.name,
-        date: session.date,
-        startTime: session.startTime,
-        endTime: session.endTime,
-        seats: booking.seats,
-        products: booking.products,
-        totalAmount,
-      };
-
-      return invoice;
+      return customer;
     } catch (error) {
-      console.error("Erro ao gerar invoice:", error);
+      console.error("Erro ao criar cliente Stripe:", error);
       throw error;
     }
-  }*/
+  }
+
+  // Função para gerar um invoice de uma reserva ao criá-la
+  async function generateInvoice(booking) {
+    try{
+      const user = await userModel.findById(booking.user);
+      if (!user) {
+        throw new NotFoundError("User not found");
+      }
+
+      // Verificar se o usuário tem um stripeCustomerId
+      if (!user.stripeCustomerId) {
+        const customer = await createStripeCustomer(user);
+        user.stripeCustomerId = customer.id;
+        await user.save();
+
+        console.log("Customer created:", customer);
+
+        // Criar um invoice para a reserva
+        const invoice = await stripe.invoices.create({
+          bookingId: booking._id,
+          user: booking.user.stripeCustomerId,
+          session: Session._id,
+          movie: Session.movie.title,
+          cinema: Session.room.cinema.name,
+          seats: booking.seats,
+          products: booking.products,
+          totalAmount: booking.totalAmount,
+          customer: customer.id,
+          auto_advance: true,
+          collection_method: "send_invoice",
+          days_until_due: 30,
+          metadata: {
+            bookingId: booking._id,
+            userId: user._id,
+          },
+        });
+
+        return invoice;
+      } else {
+        // Criar um invoice para a reserva
+        const invoice = await stripe.invoices.create({
+          bookingId: booking._id,
+          user: booking.user.stripeCustomerId,
+          session: Session._id,
+          movie: Session.movie.title,
+          room: Session.room.name,
+          cinema: Session.room.cinema.name,
+          date: Session.date,
+          startTime: Session.startTime,
+          endTime: Session.endTime,
+          seats: booking.seats,
+          products: booking.products,
+          totalAmount: booking.totalAmount,
+          customer: user.stripeCustomerId,
+          auto_advance: true,
+          collection_method: "send_invoice",
+          days_until_due: 30,
+          metadata: {
+            bookingId: booking._id,
+            userId: user._id,
+          },
+        });
+
+        console.log("Invoice created:", invoice);
+
+        return invoice;
+      }
+
+    } catch (error) {
+      console.error("Erro ao gerar fatura:", error);
+      throw error;
+    }
+  }
 
   // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
@@ -471,7 +519,10 @@ function bookingService(bookingModel) {
         // Criar um relatório de pagamento interno
         await financialReportController.createInternalPaymentReport(report);
 
-        return savedBooking;
+        // Gerar um invoice para a reserva
+        const invoice = await generateInvoice(savedBooking);
+
+        return savedBooking, invoice;
       }
     } catch (error) {
       console.error("Erro em handlePaymentConfirmation:", error);
@@ -544,6 +595,8 @@ function bookingService(bookingModel) {
           quantity: item.quantity, // Quantidade correta
         });
       }
+
+      console.log("Session", session);
 
       // Adicionar o ingresso ao line_items
       line_items.push({
