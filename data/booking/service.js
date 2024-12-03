@@ -393,7 +393,7 @@ function bookingService(bookingModel) {
           created_at: new Date(),
         });
       } catch (error) {
-        console.error("Erro ao gerar relatório:", error);
+        console.error('Erro ao gerar relatório:', error);
         // Não vamos falhar a transação se o relatório falhar
       }
 
