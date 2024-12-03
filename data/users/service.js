@@ -76,14 +76,28 @@ function UserService(UserModel) {
     }
   }
 
-  // Converte para async
-  async function findAll() {
+  async function findAll(page = 1, limit = 10, filters = {}) {
     try {
-      const users = await UserModel.find({});
+      const skip = (page - 1) * limit;
+
+      // Buscar usuários com filtros e paginação
+      const users = await UserModel.find(filters).skip(skip).limit(limit);
+
       if (!users) throw new DatabaseError("Users not found");
       if (users.length === 0) throw new NotFoundError("No users found");
-      return users;
+
+      const totalUsers = await UserModel.countDocuments(filters);
+      const totalPages = Math.ceil(totalUsers / limit);
+
+      return {
+        users,
+        totalUsers,
+        totalPages,
+        currentPage: page,
+        limit,
+      };
     } catch (err) {
+      console.log(err);
       throw err;
     }
   }

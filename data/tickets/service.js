@@ -43,16 +43,30 @@ function TicketService(ticketModel) {
         }
     }
 
-    async function findAll() {
-        try {
-            let tickets = await ticketModel.find();
-            if (!tickets) throw new DatabaseError("Tickets not found");
-            if (tickets.length === 0) throw new NotFoundError("No tickets found");
-            return tickets;
-        } catch (error) {
-            console.log(error);
-            throw error;
-        }
+    async function findAll(page = 1, limit = 10, filters = {}) {
+      try {
+        const skip = (page - 1) * limit;
+
+        // Buscar tickets com filtros e paginação
+        const tickets = await ticketModel.find(filters).skip(skip).limit(limit);
+
+        if (!tickets) throw new DatabaseError("Tickets not found");
+        if (tickets.length === 0) throw new NotFoundError("No tickets found");
+
+        const totalTickets = await ticketModel.countDocuments(filters);
+        const totalPages = Math.ceil(totalTickets / limit);
+
+        return {
+          tickets,
+          totalTickets,
+          totalPages,
+          currentPage: page,
+          limit,
+        };
+      } catch (error) {
+        console.log(error);
+        throw error;
+      }
     }
 
     async function removeById(id) {
