@@ -312,101 +312,6 @@ function bookingService(bookingModel) {
     }
   }
 
-  // Criar um stripe customer para gerar um invoice
-  async function createStripeCustomer(user) {
-    try {
-      const customer = await stripe.customers.create({
-        name: user.name,
-        email: user.email,
-        metadata: {
-          userId: user._id,
-        },
-      });
-
-      if (!customer) {
-        throw new ServiceUnavailableError("Failed to create customer");
-      }
-
-      return customer;
-    } catch (error) {
-      console.error("Erro ao criar cliente Stripe:", error);
-      throw error;
-    }
-  }
-
-  // Função para gerar um invoice de uma reserva ao criá-la
-  async function generateInvoice(booking) {
-    try{
-      const user = await userModel.findById(booking.user);
-      if (!user) {
-        throw new NotFoundError("User not found");
-      }
-
-      // Verificar se o usuário tem um stripeCustomerId
-      if (!user.stripeCustomerId) {
-        const customer = await createStripeCustomer(user);
-        user.stripeCustomerId = customer.id;
-        await user.save();
-
-        console.log("Customer created:", customer);
-
-        // Criar um invoice para a reserva
-        const invoice = await stripe.invoices.create({
-          bookingId: booking._id,
-          user: booking.user.stripeCustomerId,
-          session: Session._id,
-          movie: Session.movie.title,
-          cinema: Session.room.cinema.name,
-          seats: booking.seats,
-          products: booking.products,
-          totalAmount: booking.totalAmount,
-          customer: customer.id,
-          auto_advance: true,
-          collection_method: "send_invoice",
-          days_until_due: 30,
-          metadata: {
-            bookingId: booking._id,
-            userId: user._id,
-          },
-        });
-
-        return invoice;
-      } else {
-        // Criar um invoice para a reserva
-        const invoice = await stripe.invoices.create({
-          bookingId: booking._id,
-          user: booking.user.stripeCustomerId,
-          session: Session._id,
-          movie: Session.movie.title,
-          room: Session.room.name,
-          cinema: Session.room.cinema.name,
-          date: Session.date,
-          startTime: Session.startTime,
-          endTime: Session.endTime,
-          seats: booking.seats,
-          products: booking.products,
-          totalAmount: booking.totalAmount,
-          customer: user.stripeCustomerId,
-          auto_advance: true,
-          collection_method: "send_invoice",
-          days_until_due: 30,
-          metadata: {
-            bookingId: booking._id,
-            userId: user._id,
-          },
-        });
-
-        console.log("Invoice created:", invoice);
-
-        return invoice;
-      }
-
-    } catch (error) {
-      console.error("Erro ao gerar fatura:", error);
-      throw error;
-    }
-  }
-
   // Função que lida com o após o pagamento ser confirmado.
   async function handlePaymentConfirmation(paymentIntentId) {
     try {
@@ -436,7 +341,19 @@ function bookingService(bookingModel) {
 
         // Buscar a reserva com o ID fornecido
         console.log("Finding booking in database...");
-        const booking = await bookingModel.findById(bookingId).populate("user");
+        const booking = await bookingModel.findById(bookingId)
+          .populate("user")
+          .populate({
+            path: "session",
+            populate: {
+              path: "room",
+              populate: {
+                path: "cinema"
+              }
+            }
+          })
+          .populate("products.product")
+          .populate("tickets");
         if (!booking) {
           console.error("Booking not found for ID:", bookingId);
           throw new NotFoundError("Booking not found");
@@ -506,7 +423,7 @@ function bookingService(bookingModel) {
         );
 
         // Formatar um relatório de pagamento interno
-        const report = {
+        const internalReport = {
           paymentId: paymentIntent.id,
           customerName: booking.user.name,
           customerEmail: booking.user.email,
@@ -516,13 +433,23 @@ function bookingService(bookingModel) {
           created_at: new Date(paymentIntent.created * 1000),
         };
 
+        const simpleReport = {
+          paymentId: paymentIntent.id, // ID do pagamento
+          receiptNumber: Math.floor(Math.random() * 1000000), // Número de recibo único
+          description: `Payment for booking ${booking._id}`, // Descrição do pagamento
+          booking: booking._id, // ID da reserva
+          issuedAt: new Date(), // Data de emissão do relatório
+          amountPaid: paymentIntent.amount_received / 100, // Valor pago
+          currency: paymentIntent.currency, // Moeda do pagamento
+        };
+
         // Criar um relatório de pagamento interno
-        await financialReportController.createInternalPaymentReport(report);
+        await financialReportController.createInternalPaymentReport(internalReport);
 
-        // Gerar um invoice para a reserva
-        const invoice = await generateInvoice(savedBooking);
+        // Criar um relatório de pagamento simples
+        await financialReportController.createSimplePaymentReport(simpleReport);
 
-        return savedBooking, invoice;
+        return savedBooking;
       }
     } catch (error) {
       console.error("Erro em handlePaymentConfirmation:", error);

@@ -13,7 +13,7 @@ async function createInternalPaymentReport(internalPaymentReport) {
     await financialReport.createInternalPaymentReport(internalPaymentReport);
   } catch (error) {
     console.log(error);
-    next(error);
+    throw error;
   }
 }
 
@@ -22,7 +22,7 @@ async function createSimplePaymentReport(simplePaymentReport) {
     await financialReport.createSimplePaymentReport(simplePaymentReport);
   } catch (error) {
     console.log(error);
-    next(error);
+    throw error;
   }
 }
 
