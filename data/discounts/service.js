@@ -295,26 +295,23 @@ function discountsService(discountModel) {
     }
 
     async function checkForExpiredDiscounts() {
-        const now = new Date();
+      try {
+        const currentTime = new Date();
 
-        try {
-            // Encontrar produtos com desconto expirado
-            const expiredDiscounts = await Product.find({
-                discountExpiration: { $lt: now },
-                discountedPrice: { $exists: true }
-            });
+        // Buscar descontos que já expiraram
+        const discounts = await discountModel.find({
+          endDate: { $lt: currentTime },
+        });
 
-            for (const product of expiredDiscounts) {
-                product.discountedPrice = undefined; // Remove o preço com desconto
-                product.discountExpiration = undefined; // Remove a validade do desconto
-                await product.save();
-            }
-
-            console.log('Descontos expirados restaurados com sucesso');
-        } catch (error) {
-            console.error("Erro ao restaurar preços de produtos:", error);
-            throw error;
+        // Desativar os descontos expirados
+        for (const discount of discounts) {
+          discount.active = false;
+          await discount.save();
         }
+      } catch (error) {
+        console.log(error);
+        throw error;
+      }
     }
 
     async function updateDiscount(discountId, discount) {
