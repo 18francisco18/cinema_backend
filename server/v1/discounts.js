@@ -12,9 +12,12 @@ function DiscountsRouter() {
     router.get("/allDiscountedProducts", discountController.findAllDiscountedProducts);
 
     router.post("/createPromoCode", discountController.createDiscountForProduct);
-    router.post("/apply-discount/:productId", discountController.applyDiscountToProduct);
-    router.post("/remove-discount/:productId", discountController.removeDiscountFromProduct);
-    // fazer rota para encerrar promoção
+    router.post("/apply-discount", discountController.applyDiscount);
+   
+
+    router.patch("/markAsInactive/:discountId", discountController.markDiscountAsInactive);
+    router.put("/updateDiscount/:discountId", discountController.updateDiscount);
+    router.delete("/deleteDiscount/:discountId", discountController.deleteDiscount);
     
 
 

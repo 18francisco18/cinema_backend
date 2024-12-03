@@ -3,9 +3,11 @@ const discountService = require('../discounts');
 const discountController = {
     createDiscountForProduct,
     getAllStripeDiscounts,
-    applyDiscountToProduct,
-    removeDiscountFromProduct,
+    applyDiscount,
     findAllDiscountedProducts,
+    markDiscountAsInactive,
+    updateDiscount,
+    deleteDiscount,
 }
 
 async function createDiscountForProduct(req, res, next) {
@@ -27,28 +29,47 @@ async function getAllStripeDiscounts(req, res, next) {
     }
 }
 
-// Controlador para aplicar desconto a um produto
-async function applyDiscountToProduct(req, res, next) {
+async function applyDiscount(req, res, next) {
+  try {
+    const discountData = req.body; // Dados do desconto enviados no body
+    const discount = await discountService.createAndApplyDiscount(discountData);
+    res.status(201).json(discount);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function markDiscountAsInactive(req, res, next) {
     try {
-        const { productId } = req.params;
-        const { discountPercentage, discountExpiration } = req.body;
-        const product = await discountService.applyDiscountToProduct(productId, discountPercentage, discountExpiration);
-        res.status(200).json(product);
+        const { discountId } = req.params;
+        const discount = await discountService.markDiscountAsInactive(discountId);
+        res.status(200).json(discount);
     } catch (error) {
         next(error)
     }
 }
 
-// Controlador para remover o desconto de um produto
-async function removeDiscountFromProduct(req, res, next) {
+async function updateDiscount(req, res, next) {
     try {
-        const { productId } = req.params;
-        const product = await discountService.removeDiscountFromProduct(productId);
-        res.status(200).json(product);
+        const { discountId } = req.params;
+        const discountData = req.body;
+        const discount = await discountService.updateDiscount(discountId, discountData);
+        res.status(200).json(discount);
     } catch (error) {
         next(error)
     }
 }
+
+async function deleteDiscount(req, res, next) {
+    try {
+        const { discountId } = req.params;
+        await discountService.deleteDiscount(discountId);
+        res.status(200);
+    } catch (error) {
+        next(error)
+    }
+}
+
 
 // Controlador para buscar todos os produtos com desconto
 async function findAllDiscountedProducts(req, res, next) {

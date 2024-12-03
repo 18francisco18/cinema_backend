@@ -1,6 +1,7 @@
 const sessionModel = require("../sessions/sessions");
 const ticketModel = require("../tickets/tickets");
 const userModel = require("../users/user");
+const Discount = require("../discounts/discounts");
 const mongoose = require("mongoose");
 const financialReportController = require("../financialReports/controller");
 const QRCode = require("qrcode");
@@ -146,13 +147,36 @@ function bookingService(bookingModel) {
       if (booking.products && booking.products.length > 0) {
         for (const item of booking.products) {
           if (!item.redeemedWithPoints) {
-            const product = await Product.findById(item.product).session(session);
+            const product = await Product.findById(item.product).session(
+              session
+            );
 
-            // Adiciona o preço do produto multiplicado pela quantidade ao total
-            totalAmount += product.price * (item.quantity || 1);
+            if (!product) {
+              throw new NotFoundError("Produto não encontrado");
+            }
+
+            // Verificar se o produto tem descontos aplicados
+            let productPrice = product.price;
+            if (product.discountRef && product.discountRef.length > 0) {
+              for (const discountId of product.discountRef) {
+                const discount = await Discount.findById(discountId);
+
+                if (discount && discount.active) {
+                  if (discount.percentOff) {
+                    productPrice -= Math.round((productPrice * discount.percentOff) / 100).toFixed(2);
+                  } else if (discount.fixedAmountOff) {
+                    productPrice -= discount.fixedAmountOff;
+                  }
+                }
+              }
+            }
+
+            // Adiciona o preço do produto (com desconto, se aplicável) multiplicado pela quantidade ao total
+            totalAmount += productPrice * (item.quantity || 1);
+            console.log("Total amount after product:", totalAmount, productPrice);
           }
         }
-      }
+      };
 
       // Criar a reserva
       const newBooking = new bookingModel({
@@ -219,11 +243,15 @@ function bookingService(bookingModel) {
 
   // Função para verificar se o pagamento está pendente após 5 minutos
   async function checkingForPendingFiveMinutes(bookingId, paymentIntentId) {
-    console.log(`[Cleanup] Scheduling cleanup for booking ${bookingId} in 5 minutes`);
+    console.log(
+      `[Cleanup] Scheduling cleanup for booking ${bookingId} in 5 minutes`
+    );
     try {
       setTimeout(async () => {
         try {
-          console.log(`[Cleanup] Checking booking ${bookingId} after 5 minutes`);
+          console.log(
+            `[Cleanup] Checking booking ${bookingId} after 5 minutes`
+          );
           const booking = await bookingModel
             .findById(bookingId)
             .populate("products.product");
@@ -232,10 +260,14 @@ function bookingService(bookingModel) {
             return;
           }
 
-          console.log(`[Cleanup] Current booking status: ${booking.paymentStatus}`);
+          console.log(
+            `[Cleanup] Current booking status: ${booking.paymentStatus}`
+          );
           // Verificar se o status do pagamento é "pending"
           if (booking.paymentStatus === "pending") {
-            console.log(`[Cleanup] Booking ${bookingId} is still pending after 5 minutes, initiating cleanup`);
+            console.log(
+              `[Cleanup] Booking ${bookingId} is still pending after 5 minutes, initiating cleanup`
+            );
             // Cancelar o PaymentIntent associado
             if (paymentIntentId) {
               await cancelPaymentIntent(paymentIntentId);
@@ -279,16 +311,24 @@ function bookingService(bookingModel) {
 
             // Remover a reserva do banco de dados
             await removeById(bookingId);
-            console.log(`[Cleanup] Booking ${bookingId} deleted and PaymentIntent canceled`);
+            console.log(
+              `[Cleanup] Booking ${bookingId} deleted and PaymentIntent canceled`
+            );
           }
         } catch (error) {
-          console.error(`[Cleanup] Error deleting booking ${bookingId}:`, error);
+          console.error(
+            `[Cleanup] Error deleting booking ${bookingId}:`,
+            error
+          );
         }
       }, 5 * 60 * 1000); // 5 minutos em milissegundos
 
       return { message: "Booking deletion scheduled in 5 minutes" };
     } catch (error) {
-      console.error(`[Cleanup] Error scheduling booking deletion ${bookingId}:`, error);
+      console.error(
+        `[Cleanup] Error scheduling booking deletion ${bookingId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -380,8 +420,8 @@ function bookingService(bookingModel) {
           path: "session",
           populate: {
             path: "movie",
-            select: "title"
-          }
+            select: "title",
+          },
         })
         .select("+paymentIntentId"); // Garantir que o paymentIntentId seja incluído
 
@@ -405,7 +445,7 @@ function bookingService(bookingModel) {
       const qrCode = await generateQRCode(booking);
 
       // Aguardar um momento para garantir que o webhook do Stripe atualizou o paymentIntentId
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Buscar a reserva atualizada com o paymentIntentId
       const updatedBooking = await bookingModel
@@ -425,17 +465,19 @@ function bookingService(bookingModel) {
           created_at: new Date(),
         });
       } catch (error) {
-        console.error('Erro ao gerar relatório:', error);
+        console.error("Erro ao gerar relatório:", error);
         // Não vamos falhar a transação se o relatório falhar
       }
 
       // Enviar email com o QR Code
       try {
-        const { sendBookingConfirmationEmail } = require('../../services/emailService');
+        const {
+          sendBookingConfirmationEmail,
+        } = require("../../services/emailService");
         await sendBookingConfirmationEmail(booking, qrCode);
-        console.log('Email de confirmação enviado com sucesso');
+        console.log("Email de confirmação enviado com sucesso");
       } catch (emailError) {
-        console.error('Erro ao enviar email de confirmação:', emailError);
+        console.error("Erro ao enviar email de confirmação:", emailError);
         // Não vamos falhar a transação se o email falhar
         // O usuário ainda pode ver o QR code na área do cliente
       }
@@ -477,28 +519,38 @@ function bookingService(bookingModel) {
         if (!product)
           throw new NotFoundError(`Product not found: ${item.product._id}`);
 
-        console.log(`Product ID: ${product}`);
-        console.log(`Discounted Price: ${product.discountedPrice}`);
-        console.log(`Discount Expiration: ${product.discountExpiration}`);
+        console.log(`Product ID: ${product._id}`);
         console.log(`Current Date: ${new Date()}`);
 
-        // Verificar se o desconto é válido
-        const isDiscountValid =
-          product.discountedPrice && product.discountExpiration > new Date();
+        // Verificar se o produto tem descontos aplicados
+        let productPrice = product.price;
+        console.log(`Product price: ${productPrice}`);
+        console.log(`Product discountRef: ${product.discountRef}`);
+        if (product.discountRef && product.discountRef.length > 0) {
+          console.log("Product has discounts");
+          for (const discountId of product.discountRef) {
+            const discount = await Discount.findById(discountId);
 
-        // Calcular o preço a cobrar com base no desconto
-        const applyPrice = isDiscountValid
-          ? product.discountedPrice
-          : product.price;
-
-        console.log(`Is Discount Valid: ${isDiscountValid}`);
-        console.log(`Price to charge: ${applyPrice}`);
+            if (
+              discount &&
+              discount.active &&
+              discount.startDate <= new Date() &&
+              (!discount.endDate || discount.endDate > new Date())
+            ) {
+              if (discount.percentOff) {
+                productPrice -= Math.round((productPrice * discount.percentOff) / 100).toFixed(2);
+                console.log(`Product price after discount: ${productPrice}`);
+              } else if (discount.fixedAmountOff) {
+                productPrice -= discount.fixedAmountOff;
+              }
+            }
+          }
+        }
 
         // Verificar se o produto foi redimido com pontos, se sim, o preço é 0
         // caso contrário, o preço é o preço normal (ou com desconto) do produto
-        const priceToCharge = item.redeemedWithPoints ? 0 : applyPrice;
+        const priceToCharge = item.redeemedWithPoints ? 0 : productPrice;
 
-        console.log(`Is Discount Valid: ${isDiscountValid}`);
         console.log(`Price to charge: ${priceToCharge}`);
 
         // Adicionar o produto ao line_items com a quantidade correta
@@ -525,10 +577,10 @@ function bookingService(bookingModel) {
           product_data: {
             name: `Movie Ticket for ${session.movie.title}`,
             description: `
-                        Seats: ${booking.seats.join(", ")}
-                        Room: ${session.room.name}
-                        Cinema: ${session.room.cinema.name}
-                    `,
+                      Seats: ${booking.seats.join(", ")}
+                      Room: ${session.room.name}
+                      Cinema: ${session.room.cinema.name}
+                  `,
             images: [session.movie.poster],
           },
           unit_amount: session.price * 100,
