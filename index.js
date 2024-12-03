@@ -22,6 +22,14 @@ mongoose
 let router = require(`./server/${apiVersion}/router`);
 var app = express();
 
+// Limitador de requisições
+const rateLimit = require("express-rate-limit");
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Limite de 100 requisições por IP
+});
+
+
 // Configuração do CORS
 app.use(CORS({
   origin: 'http://localhost:4000',
@@ -37,6 +45,7 @@ app.use(cookieParser());
 
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
+app.use(limiter);
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos
 // ATENÇÃO: A razão do uso do node-cron é explicada no arquivo service.js de sessions,

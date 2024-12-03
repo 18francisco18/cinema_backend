@@ -3,6 +3,7 @@ const express = require("express");
 const bookingController = require("../../data/booking/controller");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const bookingService = require("../../data/booking");
+const Booking = require("../../data/booking/booking"); // Importando o modelo correto
 
 function BookingRouter() {
   let router = express();
@@ -34,23 +35,44 @@ function BookingRouter() {
       switch (event.type) {
         case "payment_intent.created":
           const paymentIntentCreated = event.data.object;
-          console.log("bookingId:", paymentIntentCreated.metadata.bookingId);
-          console.log("paymentIntentId:", paymentIntentCreated.id);
+          console.log("Payment Intent Created - Full Details:", {
+            id: paymentIntentCreated.id,
+            status: paymentIntentCreated.status,
+            amount: paymentIntentCreated.amount,
+            metadata: paymentIntentCreated.metadata,
+            bookingId: paymentIntentCreated.metadata?.bookingId,
+            created: new Date(paymentIntentCreated.created * 1000).toISOString(),
+          });
 
-          // Encontrar o booking associado ao paymentIntentId
-          const booking = await bookingService.findById(
-            paymentIntentCreated.metadata.bookingId
-          );
-          if (!booking) {
-            console.error(
-              "Booking não encontrado para o paymentIntentId:",
-              paymentIntentCreated.id
-            );
-            return res.status(404).send("Booking não encontrado");
+          // Se não tiver bookingId nos metadados, é provavelmente um evento de teste
+          if (!paymentIntentCreated.metadata?.bookingId) {
+            console.log("Evento de teste recebido - ignorando");
+            return res.json({ received: true });
           }
 
-          booking.paymentIntentId = paymentIntentCreated.id;
-          await booking.save();
+          try {
+            // Apenas registrar o paymentIntentId no booking
+            const booking = await Booking.findByIdAndUpdate(
+              paymentIntentCreated.metadata.bookingId,
+              { paymentIntentId: paymentIntentCreated.id },
+              { new: true }
+            );
+            
+            if (!booking) {
+              console.error(
+                "Booking não encontrado para o ID:",
+                paymentIntentCreated.metadata.bookingId
+              );
+              // Não retornamos erro para o Stripe, apenas logamos
+              return res.json({ received: true });
+            }
+
+            console.log("PaymentIntentId atualizado no booking:", booking._id);
+          } catch (error) {
+            console.error("Erro ao processar payment_intent.created:", error);
+            // Não retornamos erro para o Stripe, apenas logamos
+            return res.json({ received: true });
+          }
           break;
 
         case "checkout.session.completed":
@@ -73,22 +95,22 @@ function BookingRouter() {
             created: new Date(paymentIntent.created * 1000).toISOString(),
           });
 
+          // Se não tiver bookingId nos metadados, é provavelmente um evento de teste
+          if (!paymentIntent.metadata?.bookingId) {
+            console.log("Evento de teste recebido para payment_intent.succeeded - ignorando");
+            return res.json({ received: true });
+          }
+
           try {
             console.log("Initiating payment confirmation handling...");
             // Handle payment confirmation through the service which will update status
             // and handle all necessary side effects (emails, QR codes, etc)
-            await bookingController.handlePaymentConfirmation(
-              paymentIntent.id,
-              null
-            );
+            await bookingController.handlePaymentConfirmation(paymentIntent.metadata.bookingId);
             console.log("Payment confirmation handled successfully");
           } catch (error) {
-            console.error("Detailed error in payment confirmation:", {
-              message: error.message,
-              stack: error.stack,
-              name: error.name,
-            });
-            // Don't throw here - we want to acknowledge the webhook
+            console.error("Erro ao confirmar pagamento:", error.message);
+            // Não retornamos erro para o Stripe, apenas logamos
+            return res.json({ received: true });
           }
           break;
 

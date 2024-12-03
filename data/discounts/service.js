@@ -17,10 +17,12 @@ function discountsService(discountModel) {
     let service = {
         createDiscountCoupon,
         findAllStripeDiscounts,
-        applyDiscountToProduct,
-        removeDiscountFromProduct,
+        createAndApplyDiscount,
         findAllDiscountedProducts,
         checkForExpiredDiscounts,
+        markDiscountAsInactive,
+        updateDiscount,
+        deleteDiscount,
     }
 
     async function createDiscountCoupon(discount) {
@@ -69,38 +71,198 @@ function discountsService(discountModel) {
         }
     }
 
-    async function applyDiscountToProduct(productId, discountPercentage, expirationDate) {
+    async function createAndApplyDiscount(discountData) {
+      const {
+        type,
+        productId,
+        userId,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+      } = discountData;
+
+      // Validações básicas
+      if (type === "product" && !productId) {
+        throw new Error(
+          "ID do produto é obrigatório para descontos do tipo 'product'."
+        );
+      }
+      if (type === "user" && !userId) {
+        throw new Error(
+          "ID do usuário é obrigatório para descontos do tipo 'user'."
+        );
+      }
+
+
+
+      // Criação do desconto
+      const discount = new discountModel({
+        type,
+        productId: type === "product" ? productId : null,
+        userId: type === "user" ? userId : null,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+        active: true,
+      });
+
+      await discount.save();
+
+      // Aplicação do desconto no produto (se for do tipo 'product')
+      if (type === "product") {
+        const product = await Product.findById(productId);
+        if (!product) {
+          throw new Error("Produto não encontrado.");
+        }
+
+        product.discountRef.push(discount._id); // Associa o desconto ao produto
+        await product.save();
+      }
+
+      return discount;
+    }
+
+
+    async function markDiscountAsInactive(discountId) {
         try {
-            const product = await Product.findById(productId);
-            if (!product) throw new NotFoundError("Produto não encontrado");
+            const discount = await discountModel.findById(discountId);
+            if (!discount) throw new NotFoundError("Desconto não encontrado");
 
-            // Calcular e aplicar o preço com desconto
-            let discountedPrice = product.price * (1 - discountPercentage / 100);
-            // Arredondar para 2 casas decimais
-            discountedPrice = parseFloat(discountedPrice.toFixed(2));
-            product.discountedPrice = discountedPrice;
-            product.discountExpiration = expirationDate; // Definir data de validade do desconto
-            await product.save();
-
-            return discountedPrice;
+            discount.active = false;
+            await discount.save();
         } catch (error) {
             console.log(error);
             throw error;
         }
     }
+            
 
-    async function removeDiscountFromProduct(productId) {
-        try {
-            const product = await Product.findById(productId);
-            if (!product) throw new NotFoundError("Produto não encontrado");
 
-            product.discountedPrice = undefined; // Remover preço com desconto
-            product.discountExpiration = undefined; // Remover validade do desconto
-            await product.save();
-        } catch (error) {
-            console.log(error);
-            throw error;
-        }
+
+    async function createAndApplyDiscountToUser(discountData) {
+      const {
+        userId,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+      } = discountData;
+
+      if (!userId) {
+        throw new Error(
+          "ID do usuário é obrigatório para descontos de usuário."
+        );
+      }
+
+      // Criação do desconto
+      const discount = new Discount({
+        type: "user",
+        userId,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+        active: true,
+      });
+
+      await discount.save();
+
+      // Associar o desconto ao usuário (se necessário, em um esquema separado)
+      // Exemplo: se o usuário tiver um campo para descontos aplicados.
+      return discount;
+    }
+
+
+
+
+
+    async function createAndApplyDiscountToProduct(discountData) {
+      const {
+        productId,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+      } = discountData;
+
+      if (!productId) {
+        throw new Error(
+          "ID do produto é obrigatório para descontos de produto."
+        );
+      }
+
+      // Criação do desconto
+      const discount = new Discount({
+        type: "product",
+        productId,
+        percentOff,
+        fixedAmountOff,
+        startDate,
+        endDate,
+        description,
+        active: true,
+      });
+
+      await discount.save();
+
+      // Associar o desconto ao produto
+      const product = await Product.findById(productId);
+      if (!product) {
+        throw new Error("Produto não encontrado.");
+      }
+
+      product.discount = discount._id;
+      await product.save();
+
+      return discount;
+    }
+
+
+
+
+
+    async function applyDiscountToProductForUser(
+      productId,
+      userId,
+      discountId
+    ) {
+      // Verifica se o desconto é válido e pertence ao usuário
+      const discount = await Discount.findOne({
+        _id: discountId,
+        userId,
+        active: true,
+      });
+      if (!discount) {
+        throw new Error(
+          "Desconto inválido ou não autorizado para este usuário."
+        );
+      }
+
+      // Busca o produto
+      const product = await Product.findById(productId);
+      if (!product) {
+        throw new Error("Produto não encontrado.");
+      }
+
+      // Calcula o novo preço com base no desconto
+      const discountedPrice =
+        product.price - product.price * (discount.percentOff / 100);
+
+      // Opcional: Atualiza o produto com o preço com desconto (caso seja necessário)
+      return {
+        productId: product._id,
+        originalPrice: product.price,
+        discountedPrice,
+        discount: discount.percentOff,
+        description: discount.description,
+      };
     }
 
     async function findAllDiscountedProducts(page = 1, limit = 10) {
@@ -133,24 +295,58 @@ function discountsService(discountModel) {
     }
 
     async function checkForExpiredDiscounts() {
-        const now = new Date();
+      try {
+        const currentTime = new Date();
 
+        // Buscar descontos que já expiraram
+        const discounts = await discountModel.find({
+          endDate: { $lt: currentTime },
+        });
+
+        // Desativar os descontos expirados
+        for (const discount of discounts) {
+          discount.active = false;
+          await discount.save();
+        }
+      } catch (error) {
+        console.log(error);
+        throw error;
+      }
+    }
+
+    async function updateDiscount(discountId, discount) {
         try {
-            // Encontrar produtos com desconto expirado
-            const expiredDiscounts = await Product.find({
-                discountExpiration: { $lt: now },
-                discountedPrice: { $exists: true }
-            });
 
-            for (const product of expiredDiscounts) {
-                product.discountedPrice = undefined; // Remove o preço com desconto
-                product.discountExpiration = undefined; // Remove a validade do desconto
+            const updateDiscount = await discountModel.findByIdAndUpdate(discountId, discount, {
+                new: true,
+            });
+            if (!updateDiscount) throw new NotFoundError("Desconto não encontrado");
+            await updateDiscount.save();
+        } catch (error) {
+            console.log(error);
+            throw error;
+        }
+    }
+
+    async function deleteDiscount(discountId) {
+        try {
+            const discount = await discountModel.findByIdAndDelete(discountId);
+            if (!discount) throw new NotFoundError("Desconto não encontrado");
+
+            // Remover o desconto do produto (se houver)
+            if (discount.productId) {
+                const product = await Product.findById(discount.productId);
+                if (!product) throw new NotFoundError("Produto não encontrado");
+
+                product.discounts = product.discounts.filter(
+                  (id) => id.toString() !== discountId.toString()
+                );
+
                 await product.save();
             }
 
-            console.log('Descontos expirados restaurados com sucesso');
         } catch (error) {
-            console.error("Erro ao restaurar preços de produtos:", error);
+            console.log(error);
             throw error;
         }
     }
