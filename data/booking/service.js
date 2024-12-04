@@ -410,9 +410,6 @@ function bookingService(bookingModel) {
         // O usuário ainda pode ver o QR code na área do cliente
       }
 
-      // Gerar um invoice para a reserva
-      const invoice = await generateInvoice(booking);
-
       return booking;
     } catch (error) {
       console.error("Erro em handlePaymentConfirmation:", error);
