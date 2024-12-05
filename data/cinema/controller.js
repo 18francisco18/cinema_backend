@@ -1,6 +1,7 @@
 const cinemaService = require('../cinema');
 
 
+
 const cinemaController = {
     createCinema,
     findAllCinemas,
@@ -126,8 +127,7 @@ async function addMoviesToBillboard(req, res, next) {
         console.log(req.params);
         const { id } = req.params;
         const { movieId } = req.params;
-        const { movies } = req.body;
-        const cinema = await cinemaService.addMovieToBillboard(id, movies, movieId);
+        const cinema = await cinemaService.addMovieToBillboard(id, [], movieId);
         res.status(200).send(cinema);
     } catch (error) {
         next(error);
