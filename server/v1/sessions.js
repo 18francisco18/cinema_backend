@@ -13,6 +13,7 @@ function SessionsRouter() {
   router.get("/:id", sessionsController.getSessionById);
   router.get("/:sessionId/get-session-report", sessionsController.getSessionsReport);
   router.get("/getAll", sessionsController.getAllSessionReports);
+  router.get("/:sessionId/getReport", sessionsController.getSessionReport);
   
   router.put("/:id/cancelSession", sessionsController.cancelSession);
   router.put("/:id/applyUnavailability", sessionsController.applyUnavaliabilityToSeats);

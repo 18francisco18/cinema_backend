@@ -31,6 +31,7 @@ function SessionService(sessionModel) {
     applyUnavailabilityToSeats,
     generateSessionReport,
     getAllSessionReports,
+    getReportFromSession,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -545,6 +546,24 @@ function SessionService(sessionModel) {
       }
 
       throw new Error(`Error generating session report: ${error.message}`);
+    }
+  }
+
+  // Função para buscar um relatório de sessão a partir do ID da sessão
+  async function getReportFromSession(sessionId) {
+    try {
+      let session = await sessionModel.findById(sessionId);
+      if (!session) {
+        throw new NotFoundError("Session not found");
+      }
+      let report = await sessionReport.find({ sessionId: session });
+      if (!report) {
+        throw new NotFoundError("Report not found");
+      }
+      return report;
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
   }
 

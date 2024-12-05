@@ -12,6 +12,7 @@ const sessionsController = {
     applyUnavaliabilityToSeats,
     getSessionsReport,
     getAllSessionReports,
+    getSessionReport
 }
 
 // Controlador para criar uma nova sessão
@@ -164,6 +165,17 @@ async function getSessionsByMovie(req, res, next) {
     res.status(200).json(sessions);
   } catch (error) {
     next(error);
+  }
+}
+
+async function getSessionReport(req, res, next){
+  try {
+    const { sessionId } = req.params;
+    const report = await sessionService.getReportFromSession(sessionId);
+    res.status(200).json(report);
+  } catch (error) {
+    console.error('Erro ao gerar relatório de sessão:', error);
+    res.status(500).json({ error: 'Falha ao gerar relatório de sessão' });
   }
 }
 
