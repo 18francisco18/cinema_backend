@@ -6,6 +6,7 @@ const sessionsController = {
     getSessions,
     getSessionById,
     getSessionsByMovie,
+    getSessionsByDate,
     deleteSession,
     checkAvailability,
     checkAndUpdateSessions,
@@ -162,6 +163,34 @@ async function getSessionsByMovie(req, res, next) {
     
     const sessions = await sessionService.findByMovie(movieId, page, limit);
     res.status(200).json(sessions);
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Controlador para buscar sessões por data
+async function getSessionsByDate(req, res, next) {
+  try {
+    const { date } = req.query;
+    
+    if (!date) {
+      return res.status(400).json({ message: 'Data é obrigatória' });
+    }
+
+    // Converter a data para o início e fim do dia
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Buscar sessões dentro do intervalo de data
+    const sessions = await sessionService.findSessionsByDateRange(startDate, endDate);
+
+    res.status(200).json({
+      sessions,
+      totalSessions: sessions.length
+    });
   } catch (error) {
     next(error);
   }

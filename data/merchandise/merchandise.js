@@ -4,7 +4,7 @@ const Schema = mongoose.Schema;
 const merchandiseSchema = new Schema({
   name: { type: String, required: true },
   description: { type: String, required: true },
-  poins: { type: Number, required: true },
+  points: { type: Number, required: true },
   image: { type: String, required: true },
 });
 

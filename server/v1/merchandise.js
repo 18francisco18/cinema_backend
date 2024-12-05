@@ -18,6 +18,9 @@ function MerchandiseRouter() {
   router.put("/merchandise/:id", verifyTokenMiddleware, merchandiseController.updateMerchandise);
   router.delete("/merchandise/:id", verifyTokenMiddleware, merchandiseController.deleteMerchandise);
   router.post("/redeem/:merchandiseId", verifyTokenMiddleware, merchandiseController.redeemMerchandise);
+  
+  // Novo endpoint para buscar itens resgatados do usuário
+  router.get("/user/redeemed", verifyTokenMiddleware, merchandiseController.getUserRedeemedMerchandise);
 
   return router;
 }

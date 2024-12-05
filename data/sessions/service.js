@@ -31,6 +31,7 @@ function SessionService(sessionModel) {
     applyUnavailabilityToSeats,
     generateSessionReport,
     getAllSessionReports,
+    findSessionsByDateRange,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -548,7 +549,26 @@ function SessionService(sessionModel) {
     }
   }
 
+  async function findSessionsByDateRange(startDate, endDate) {
+    try {
+      const sessions = await Session.find({
+        date: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      })
+      .populate('movie')
+      .populate('room')
+      .sort({ startTime: 1 });
+
+      return sessions;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   return service;
 }
 
+// Exportar a função SessionService
 module.exports = SessionService;
