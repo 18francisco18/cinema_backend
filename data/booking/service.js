@@ -675,11 +675,29 @@ function bookingService(bookingModel) {
   async function findAll(page = 1, limit = 10, query = {}) {
     try {
       const skip = (page - 1) * limit;
-      const bookings = await bookingModel.find(query).skip(skip).limit(limit);
+      const bookings = await bookingModel
+        .find(query)
+        .populate({
+          path: 'session',
+          populate: {
+            path: 'movie',
+            select: 'title'
+          }
+        })
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+      
       const total = await bookingModel.countDocuments(query);
 
       if (bookings.length === 0) {
-        throw new NotFoundError("No bookings found.");
+        return {
+          bookings: [],
+          total: 0,
+          page,
+          pages: 0,
+        };
       }
 
       return {

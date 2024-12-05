@@ -67,11 +67,12 @@ function RoomService(roomModel) {
         return { rooms: [], total: 0, page, limit };
       }
 
-      // Buscar salas com lean para performance
+      // Buscar salas e popular com informações do cinema
       const rooms = await roomModel
         .find(filters)
         .limit(limit)
         .skip(skip)
+        .populate('cinema', 'name location') // Adicionar populate para o cinema
         .lean();
 
       return {

@@ -187,84 +187,31 @@ function cinemaService(cinemaModel) {
   }
 
   // Adiciona múltiplos filmes ao cartaz de um cinema (usando POST)
-  async function addMovieToBillboard(id, movies, movieId) {
-    console.log("Searching Movie");
+  async function addMovieToBillboard(cinemaId, movies, movieId) {
     try {
-      // Encontra o cinema pelo id
-      const cinema = await cinemaModel.findById(id);
-      console.log("Cinema: ", id);
+      console.log("Searching Movie");
+      const cinema = await Cinema.findById(cinemaId);
+      console.log("Cinema: ", cinemaId);
+
       if (!cinema) {
-        throw new NotFoundError("Cinema not found");
+        throw new Error("Cinema not found");
       }
-  
-      console.log("movies", movies);
-  
-      // Array para armazenar os filmes a serem adicionados
-      const moviesToAdd = [];
-  
-      // Verifique se `movies` é um array, se não for, transforme-o em um array
-      const moviesArray = Array.isArray(movies) ? movies : [movies];
-  
-      // Para cada filme a ser adicionado
-      for (let i = 0; i < moviesArray.length; i++) {
-        const { title, year, plot } = moviesArray[i];
-        
-        let movie = await Movie.findById(movieId);
 
-        if(movie) {
-          moviesToAdd.push(movie._id);
-          return moviesToAdd;
-        }
-  
-        if (!movie) {
-          // Busca os detalhes do filme pela API OMDb usando título e ano
-          const movieDetails = await movieService.getMovieByTitleYearAndPlot(title, year, plot);
-
-          if(!movieDetails) {
-            throw new NotFoundError("Movie not found");
-          }
-
-          movie = new Movie({
-            title: movieDetails.title,
-            year: movieDetails.year,
-            rated: movieDetails.rated,
-            released: movieDetails.released,
-            runtime: movieDetails.runtime,
-            genre: movieDetails.genre,
-            director: movieDetails.director,
-            writer: movieDetails.writer,
-            actors: movieDetails.actors,
-            plot: movieDetails.plot,
-            language: movieDetails.language,
-            country: movieDetails.country,
-            awards: movieDetails.awards,
-            poster: movieDetails.poster,
-            ratings: movieDetails.ratings,
-            metascore: movieDetails.metascore,
-            imdbRating: movieDetails.imdbRating,
-            imdbVotes: movieDetails.imdbVotes,
-            imdbID: movieDetails.imdbID,
-            type: movieDetails.type,
-            dvd: movieDetails.dvd,
-            boxOffice: movieDetails.boxOffice,
-            production: movieDetails.production,
-            website: movieDetails.website,
-            response: movieDetails.response,
-          });
-  
-          await movie.save();
-        }
-  
-        if (!cinema.movies.includes(movie._id)) {
-          moviesToAdd.push(movie._id);
-        }
+      // Busca o filme diretamente pelo ID
+      const movie = await Movie.findById(movieId);
+      if (!movie) {
+        throw new Error(`Movie with ID ${movieId} not found`);
       }
-  
-      cinema.movies.push(...moviesToAdd);
-      await cinema.save();
+
+      // Verifica se o filme já está no billboard
+      if (!cinema.movies.includes(movie._id)) {
+        cinema.movies.push(movie._id);
+        await cinema.save();
+      }
+
       console.log("Updated cinema movies:", cinema.movies);
-  
       return cinema.movies;
+
     } catch (err) {
       if (err.message === "Cinema not found" || err.message.startsWith("Movie with ID")) {
         throw err;
@@ -287,12 +234,12 @@ function cinemaService(cinemaModel) {
         const plot = movies[i].plot;
 
         let movie = await Movie.findOne({ title: title });
-  
+
         if (!movie) {
           // Busca os detalhes do filme pela API OMDb usando título e ano
           const movieDetails = await movieService.getMovieByTitleYearAndPlot(title, year, plot);
-          
-          if(!movieDetails) {
+
+          if (!movieDetails) {
             throw new NotFoundError("Movie not found");
           }
 
@@ -323,7 +270,7 @@ function cinemaService(cinemaModel) {
             website: movieDetails.website,
             response: movieDetails.response,
           });
-  
+
           await movie.save();
         }
 
@@ -410,36 +357,63 @@ function cinemaService(cinemaModel) {
     try {
       const skip = (page - 1) * limit;
 
-      // Adicionar o filtro para o cinema específico
-      query.cinema = id;
-
-      // Encontrar o cinema pelo id e popular os filmes com filtros, paginação e ordenação
+      // Encontrar o cinema pelo id e popular os filmes
       const cinema = await cinemaModel.findById(id).populate({
         path: "movies",
-        match: query, // Aplicar os filtros
         options: {
           skip: skip,
           limit: limit,
-          sort: sort,
-        },
+          sort: sort
+        }
       });
+
+      console.log("Cinema: ", cinema);
 
       if (!cinema) {
         throw new NotFoundError("Cinema not found");
       }
 
-      if (cinema.movies.length === 0) {
-        throw new NotFoundError("No movies found in cinema");
+      // Aplicar filtros manualmente nos filmes populados
+      let filteredMovies = cinema.movies;
+      
+      if (query.title) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.title.toLowerCase().includes(query.title.toLowerCase())
+        );
+      }
+      if (query.genre) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.genre.toLowerCase().includes(query.genre.toLowerCase())
+        );
+      }
+      if (query.year) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.year === query.year
+        );
+      }
+      if (query.rated) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.rated.toLowerCase() === query.rated.toLowerCase()
+        );
+      }
+      if (query.director) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.director.toLowerCase().includes(query.director.toLowerCase())
+        );
+      }
+      if (query.actors) {
+        filteredMovies = filteredMovies.filter(movie => 
+          movie.actors.some(actor => 
+            query.actors.includes(actor)
+          )
+        );
       }
 
-      // Contar o total de filmes do cinema com os filtros aplicados
-      const totalMovies = await Movie.countDocuments(query);
-
       return {
-        movies: cinema.movies,
-        total: totalMovies,
+        movies: filteredMovies,
+        total: filteredMovies.length,
         page: page,
-        pages: Math.ceil(totalMovies / limit),
+        pages: Math.ceil(filteredMovies.length / limit)
       };
     } catch (err) {
       console.log(err);
@@ -447,14 +421,46 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  async function getAllCinemaBillboards(req, res, next) {
+  async function getAllCinemaBillboards(
+    page = 1,
+    limit = 10,
+    filters = {},
+    sort = {}
+  ) {
     try {
-      const billboards = await cinemaService.getAllCinemaBillboards();
-      res.status(200).send(billboards);
-    } catch (error) {
-      next(error);
+      const skip = (page - 1) * limit;
+
+      const cinemas = await cinemaModel.find().skip(skip).limit(limit);
+      if (cinemas.length === 0) {
+        throw new NotFoundError("No cinemas found");
+      }
+
+      const billboards = [];
+      for (let i = 0; i < cinemas.length; i++) {
+        const cinema = cinemas[i];
+        const movies = await Movie.find({
+          _id: { $in: cinema.movies, ...filters },
+        }).sort(sort);
+        billboards.push({ cinema: cinema.name, movies: movies });
+      }
+
+      const totalCinemas = await cinemaModel.countDocuments();
+      const totalPages = Math.ceil(totalCinemas / limit);
+
+      return {
+        billboards,
+        totalCinemas,
+        totalPages,
+        currentPage: page,
+        limit,
+      };
+    } catch (err) {
+      console.log(err);
+      throw err;
     }
   }
+
+ 
   
 
   return service;

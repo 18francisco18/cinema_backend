@@ -41,7 +41,7 @@ const sendBookingConfirmationEmail = async (booking, qrCodeDataUrl, reportPath) 
             <h3 style="color: #333; margin-top: 0;">Detalhes da Reserva:</h3>
             <p><strong>Filme:</strong> ${booking.session.movie.title}</p>
             <p><strong>Data:</strong> ${new Date(booking.session.date).toLocaleDateString()}</p>
-            <p><strong>Horário:</strong> ${new Date(booking.session.date).toLocaleTimeString()}</p>
+            <p><strong>Horário:</strong> ${new Date(booking.session.startTime).toLocaleTimeString()}</p>
             <p><strong>Lugares:</strong> ${booking.seats.join(', ')}</p>
           </div>
 

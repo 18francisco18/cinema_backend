@@ -8,17 +8,18 @@ const merchandiseController = {
   updateMerchandise,
   deleteMerchandise,
   redeemMerchandise,
+  getUserRedeemedMerchandise,
 };
 
 // Criar uma nova mercadoria
 async function createMerchandise(req, res) {
-  const { name, description, poins, image } = req.body;
+  const { name, description, points, image } = req.body;
 
   try {
     const newMerchandise = new Merchandise({
       name,
       description,
-      poins,
+      points,
       image,
     });
 
@@ -59,12 +60,12 @@ async function getMerchandiseById(req, res) {
 // Atualizar uma mercadoria pelo ID
 async function updateMerchandise(req, res) {
   const { id } = req.params;
-  const { name, description, poins, image } = req.body;
+  const { name, description, points, image } = req.body;
 
   try {
     const updatedMerchandise = await Merchandise.findByIdAndUpdate(
       id,
-      { name, description, poins, image },
+      { name, description, points, image },
       { new: true }
     );
 
@@ -124,7 +125,7 @@ async function redeemMerchandise(req, res) {
     }
 
     // Verificar se o usuário tem pontos suficientes
-    if (user.points < merchandise.poins) {
+    if (user.points < merchandise.points) {
       return res.status(400).json({
         success: false,
         message: "Not enough points to redeem this merchandise",
@@ -132,7 +133,7 @@ async function redeemMerchandise(req, res) {
     }
 
     // Deduzir os pontos do usuário
-    user.points -= merchandise.poins;
+    user.points -= merchandise.points;
 
     // Associar o merchandise ao usuário
     user.redeemedMerchandise.push(merchandise._id);
@@ -147,6 +148,28 @@ async function redeemMerchandise(req, res) {
   } catch (error) {
     console.error('Error in redeemMerchandise:', error);
     res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+// Função para obter os itens resgatados do usuário
+async function getUserRedeemedMerchandise(req, res) {
+  try {
+    const userId = req.userId; 
+    const user = await User.findById(userId).populate('redeemedMerchandise');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Usuário não encontrado" 
+      });
+    }
+
+    res.status(200).json(user.redeemedMerchandise || []);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 }
 

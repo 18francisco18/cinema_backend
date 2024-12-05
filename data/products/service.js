@@ -17,7 +17,7 @@ function productService(productModel) {
 
   async function createProduct(productData) {
     try {
-      // 1. Verificar se um produto com o mesmo nome já existe no banco de dados
+      // Verificar se um produto com o mesmo nome já existe no banco de dados
       const existingProduct = await productModel.findOne({
         name: productData.name,
       });
@@ -25,21 +25,23 @@ function productService(productModel) {
         throw new ConflictError("Um produto com o mesmo nome já existe.");
       }
 
-      // 2. Criar o produto no Stripe
+      console.log(productData);
+
+      // Criar o produto no Stripe
       const stripeProduct = await stripe.products.create({
         name: productData.name,
         description: productData.description,
         images: productData.image ? [productData.image] : [],
       });
 
-      // 3. Criar o preço no Stripe
+      // Criar o preço no Stripe
       const stripePrice = await stripe.prices.create({
-        unit_amount: productData.price * 100, // o preço deve ser em centavos
-        currency: "eur", // defina a moeda conforme necessário
+        unit_amount: productData.price * 100, 
+        currency: "eur", 
         product: stripeProduct.id,
       });
 
-      // 4. Salvar o produto no banco de dados
+      // Salvar o produto no banco de dados
       const productMongoose = new productModel({
         name: productData.name,
         description: productData.description,
@@ -149,25 +151,44 @@ function productService(productModel) {
   }
 
   // Função para remover um produto pelo ID
-  async function removeProductById(id) {
-    const product = await productModel.findByIdAndDelete(id);
-    if (!product) throw new NotFoundError("Product not found");
+  async function removeProductById(productId) {
+    try {
+      const product = await productModel.findById(productId);
+      if (!product) throw new NotFoundError("Produto não encontrado");
 
-    const stripeDeleteProduct = await stripe.products.del(
-      product.stripeProductId
-    );
-    if (!stripeDeleteProduct)
-      throw new ServiceUnavailableError(
-        "Não foi possível deletar o produto no Stripe"
+      // Buscar todos os preços associados ao produto no Stripe
+      const prices = await stripe.prices.list({
+        product: product.stripeProductId,
+      });
+
+      // Deletar todos os preços associados ao produto no Stripe
+      for (const price of prices.data) {
+        const stripeDeletePrice = await stripe.prices.del(price.id);
+        if (!stripeDeletePrice) {
+          throw new ServiceUnavailableError(
+            "Não foi possível deletar o preço no Stripe"
+          );
+        }
+      }
+
+      // Deletar o produto no Stripe
+      const stripeDeleteProduct = await stripe.products.del(
+        product.stripeProductId
       );
+      if (!stripeDeleteProduct) {
+        throw new ServiceUnavailableError(
+          "Não foi possível deletar o produto no Stripe"
+        );
+      }
 
-    const stripeDeletePrice = await stripe.prices.del(product.stripePriceId);
-    if (!stripeDeletePrice)
-      throw new ServiceUnavailableError(
-        "Não foi possível deletar o preço no Stripe"
-      );
+      // Deletar o produto no banco de dados
+      await productModel.findByIdAndDelete(productId);
 
-    return product;
+      return product;
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
   }
 
   return service;
