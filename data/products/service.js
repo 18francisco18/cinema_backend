@@ -25,6 +25,8 @@ function productService(productModel) {
         throw new ConflictError("Um produto com o mesmo nome já existe.");
       }
 
+      console.log(productData);
+
       // 2. Criar o produto no Stripe
       const stripeProduct = await stripe.products.create({
         name: productData.name,
@@ -149,25 +151,44 @@ function productService(productModel) {
   }
 
   // Função para remover um produto pelo ID
-  async function removeProductById(id) {
-    const product = await productModel.findByIdAndDelete(id);
-    if (!product) throw new NotFoundError("Product not found");
+  async function removeProductById(productId) {
+    try {
+      const product = await productModel.findById(productId);
+      if (!product) throw new NotFoundError("Produto não encontrado");
 
-    const stripeDeleteProduct = await stripe.products.del(
-      product.stripeProductId
-    );
-    if (!stripeDeleteProduct)
-      throw new ServiceUnavailableError(
-        "Não foi possível deletar o produto no Stripe"
+      // Buscar todos os preços associados ao produto no Stripe
+      const prices = await stripe.prices.list({
+        product: product.stripeProductId,
+      });
+
+      // Deletar todos os preços associados ao produto no Stripe
+      for (const price of prices.data) {
+        const stripeDeletePrice = await stripe.prices.del(price.id);
+        if (!stripeDeletePrice) {
+          throw new ServiceUnavailableError(
+            "Não foi possível deletar o preço no Stripe"
+          );
+        }
+      }
+
+      // Deletar o produto no Stripe
+      const stripeDeleteProduct = await stripe.products.del(
+        product.stripeProductId
       );
+      if (!stripeDeleteProduct) {
+        throw new ServiceUnavailableError(
+          "Não foi possível deletar o produto no Stripe"
+        );
+      }
 
-    const stripeDeletePrice = await stripe.prices.del(product.stripePriceId);
-    if (!stripeDeletePrice)
-      throw new ServiceUnavailableError(
-        "Não foi possível deletar o preço no Stripe"
-      );
+      // Deletar o produto no banco de dados
+      await productModel.findByIdAndDelete(productId);
 
-    return product;
+      return product;
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
   }
 
   return service;
