@@ -17,7 +17,7 @@ function productService(productModel) {
 
   async function createProduct(productData) {
     try {
-      // 1. Verificar se um produto com o mesmo nome já existe no banco de dados
+      // Verificar se um produto com o mesmo nome já existe no banco de dados
       const existingProduct = await productModel.findOne({
         name: productData.name,
       });
@@ -27,21 +27,21 @@ function productService(productModel) {
 
       console.log(productData);
 
-      // 2. Criar o produto no Stripe
+      // Criar o produto no Stripe
       const stripeProduct = await stripe.products.create({
         name: productData.name,
         description: productData.description,
         images: productData.image ? [productData.image] : [],
       });
 
-      // 3. Criar o preço no Stripe
+      // Criar o preço no Stripe
       const stripePrice = await stripe.prices.create({
-        unit_amount: productData.price * 100, // o preço deve ser em centavos
-        currency: "eur", // defina a moeda conforme necessário
+        unit_amount: productData.price * 100, 
+        currency: "eur", 
         product: stripeProduct.id,
       });
 
-      // 4. Salvar o produto no banco de dados
+      // Salvar o produto no banco de dados
       const productMongoose = new productModel({
         name: productData.name,
         description: productData.description,

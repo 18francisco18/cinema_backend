@@ -367,6 +367,8 @@ function cinemaService(cinemaModel) {
         }
       });
 
+      console.log("Cinema: ", cinema);
+
       if (!cinema) {
         throw new NotFoundError("Cinema not found");
       }
@@ -419,14 +421,46 @@ function cinemaService(cinemaModel) {
     }
   }
 
-  async function getAllCinemaBillboards(req, res, next) {
+  async function getAllCinemaBillboards(
+    page = 1,
+    limit = 10,
+    filters = {},
+    sort = {}
+  ) {
     try {
-      const billboards = await cinemaService.getAllCinemaBillboards();
-      res.status(200).send(billboards);
-    } catch (error) {
-      next(error);
+      const skip = (page - 1) * limit;
+
+      const cinemas = await cinemaModel.find().skip(skip).limit(limit);
+      if (cinemas.length === 0) {
+        throw new NotFoundError("No cinemas found");
+      }
+
+      const billboards = [];
+      for (let i = 0; i < cinemas.length; i++) {
+        const cinema = cinemas[i];
+        const movies = await Movie.find({
+          _id: { $in: cinema.movies, ...filters },
+        }).sort(sort);
+        billboards.push({ cinema: cinema.name, movies: movies });
+      }
+
+      const totalCinemas = await cinemaModel.countDocuments();
+      const totalPages = Math.ceil(totalCinemas / limit);
+
+      return {
+        billboards,
+        totalCinemas,
+        totalPages,
+        currentPage: page,
+        limit,
+      };
+    } catch (err) {
+      console.log(err);
+      throw err;
     }
   }
+
+ 
   
 
   return service;
