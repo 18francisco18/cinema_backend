@@ -13,6 +13,7 @@ let CategoriesAPI = require("./categories");
 let DiscountsAPI = require("./discounts");
 let PointsAPI = require("./points");
 let MerchandiseAPI = require("./merchandise");
+let PromocodesAPI = require("./promocodes");
 
 function init(prefix) {
   let api = express();
@@ -31,6 +32,8 @@ function init(prefix) {
   api.use(`${prefix}/discounts`, DiscountsAPI());
   api.use(`${prefix}/points`, PointsAPI());
   api.use(`${prefix}/merchandise`, MerchandiseAPI());
+  api.use(`${prefix}/discounts/promocodes`, PromocodesAPI());
+
 
   return api;
 }
