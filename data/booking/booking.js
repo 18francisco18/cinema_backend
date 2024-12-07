@@ -27,6 +27,7 @@ const bookingSchema = new Schema({
       redeemedWithPoints: { type: Boolean, default: false },
     },
   ],
+  promocode: { type: String, required: false },
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);

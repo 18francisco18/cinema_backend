@@ -1,4 +1,4 @@
-const promocodeService = require('./service');
+const promocodeService = require('../promocodes');
 
 
 const promocodeController = {
@@ -14,6 +14,7 @@ const promocodeController = {
 
 async function createPromocode(req, res, next) {
     try {
+        const promocode = req.body;
         const newPromocode = await promocodeService.createPromocode(promocode);
         res.status(201).json(newPromocode);
     } catch (error) {

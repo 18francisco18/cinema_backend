@@ -11,7 +11,7 @@ function PromocodesRouter() {
     router.get("/all", promocodeController.findAllPromocodes);
     router.get("/:id", promocodeController.findPromocodeById);
 
-    router.post("/createPromoCode", promocodeController.createPromocode);
+    router.post("/create", promocodeController.createPromocode);
 
 
     router.patch("/markAsInactive/:id", promocodeController.markPromocodeAsInactive);

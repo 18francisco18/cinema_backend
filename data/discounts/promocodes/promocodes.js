@@ -18,10 +18,11 @@ const promocodeSchema = new Schema({
     discount: { type: Number, required: true },
     type: { type: String, enum: type, required: true },
     discountType: { type: String, enum: discountType, required: true },
-    maxUsage: { type: Number, required: true },
-    startDate: { type: Date, required: true },
+    maxUsage: { type: Number, required: false },
+    startDate: { type: Date, required: true, default: Date.now },
     endDate: { type: Date, required: true },
-    active: { type: Boolean, default: true }
+    active: { type: Boolean, default: true },
+    usedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }]
 });
 
 const Promocode = mongoose.model('Promocode', promocodeSchema);

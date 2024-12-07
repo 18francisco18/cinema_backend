@@ -10,6 +10,7 @@ const sessionStatus = require("../sessions/sessionStatus");
 const dotenv = require("dotenv");
 const Session = require("../sessions/sessions");
 const Product = require("../products/product");
+const promocodeService = require("../discounts/promocodes/index");
 const QRCodeSchema = require("./qrcode");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
@@ -52,45 +53,48 @@ function bookingService(bookingModel) {
     const redeemedProducts = [];
 
     // Iterar sobre cada produto no array
-    for (const item of products) {
-      // Verificar se o produto foi redimido com pontos
-      if (item.redeemedWithPoints) {
-        const product = await Product.findById(item.product)
-          .populate("pointsRef")
-          .session(session);
+    if (products) {
+      for (const item of products) {
+        // Verificar se o produto foi redimido com pontos
+        if (item.redeemedWithPoints) {
+          const product = await Product.findById(item.product)
+            .populate("pointsRef")
+            .session(session);
 
-        if (!product)
-          throw new NotFoundError(`Product not found: ${item.product}`);
+          if (!product)
+            throw new NotFoundError(`Product not found: ${item.product}`);
 
-        // Verificar se o produto tem um preço em pontos
-        const pointsCost = product.pointsRef?.points || 0;
+          // Verificar se o produto tem um preço em pontos
+          const pointsCost = product.pointsRef?.points || 0;
 
-        // Verificar pontos suficientes
-        const totalPointsRequired = pointsCost * (item.quantity || 1);
-        if (user.points < totalPointsRequired) {
-          throw new ValidationError(
-            `Insufficient points for product: ${product.name}`
-          );
+          // Verificar pontos suficientes
+          const totalPointsRequired = pointsCost * (item.quantity || 1);
+          if (user.points < totalPointsRequired) {
+            throw new ValidationError(
+              `Insufficient points for product: ${product.name}`
+            );
+          }
+
+          // Deduzir pontos
+          user.points -= totalPointsRequired;
+
+          // Adicionar o produto redimido ao array
+          redeemedProducts.push({
+            product: product._id,
+            quantity: item.quantity || 1,
+            redeemedWithPoints: true,
+          });
+        } else {
+          // Adicionar o produto ao array sem redimir pontos
+          redeemedProducts.push({
+            product: item.product,
+            quantity: item.quantity || 1,
+            redeemedWithPoints: false,
+          });
         }
-
-        // Deduzir pontos
-        user.points -= totalPointsRequired;
-
-        // Adicionar o produto redimido ao array
-        redeemedProducts.push({
-          product: product._id,
-          quantity: item.quantity || 1,
-          redeemedWithPoints: true,
-        });
-      } else {
-        // Adicionar o produto ao array sem redimir pontos
-        redeemedProducts.push({
-          product: item.product,
-          quantity: item.quantity || 1,
-          redeemedWithPoints: false,
-        });
       }
     }
+    
 
     await user.save({ session });
     return redeemedProducts;
@@ -163,7 +167,9 @@ function bookingService(bookingModel) {
 
                 if (discount && discount.active) {
                   if (discount.percentOff) {
-                    productPrice -= Math.round((productPrice * discount.percentOff) / 100).toFixed(2);
+                    productPrice -= Math.round(
+                      (productPrice * discount.percentOff) / 100
+                    ).toFixed(2);
                   } else if (discount.fixedAmountOff) {
                     productPrice -= discount.fixedAmountOff;
                   }
@@ -173,10 +179,26 @@ function bookingService(bookingModel) {
 
             // Adiciona o preço do produto (com desconto, se aplicável) multiplicado pela quantidade ao total
             totalAmount += productPrice * (item.quantity || 1);
-            console.log("Total amount after product:", totalAmount, productPrice);
+            console.log(
+              "Total amount after product:",
+              totalAmount,
+              productPrice
+            );
           }
         }
-      };
+      }
+
+      console.log("Total amount:", totalAmount);
+
+      // Aplicar o promocode, se fornecido
+      if (booking.promocode) {
+        totalAmount = await promocodeService.applyPromocode(
+          booking,
+          totalAmount
+        );
+      }
+
+      console.log("Total amount after promocode:", totalAmount);
 
       // Criar a reserva
       const newBooking = new bookingModel({
