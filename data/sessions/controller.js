@@ -13,7 +13,8 @@ const sessionsController = {
     applyUnavaliabilityToSeats,
     getSessionsReport,
     getAllSessionReports,
-    getReport
+    getReport,
+    summonSessionReport
 }
 
 // Controlador para criar uma nova sessão
@@ -204,6 +205,17 @@ async function getSessionsByDate(req, res, next) {
       sessions,
       totalSessions: sessions.length
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Controlador para descarregar um relatório de sessão
+async function summonSessionReport(req, res, next) {
+  try {
+    const { sessionId } = req.params;
+    const report = await sessionService.downloadSessionReport(sessionId);
+    res.status(200).json(report);
   } catch (error) {
     next(error);
   }

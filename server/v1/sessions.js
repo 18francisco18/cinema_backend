@@ -15,6 +15,7 @@ function SessionsRouter() {
   router.get("/:sessionId/get-session-report", sessionsController.getSessionsReport);
   router.get("/getAll", sessionsController.getAllSessionReports);
   router.get("/:sessionId/getReport", sessionsController.getReport);
+  router.get("/:sessionId/summonSessionReport", sessionsController.summonSessionReport);
   
   router.put("/:id/cancelSession", sessionsController.cancelSession);
   router.put("/:id/applyUnavailability", sessionsController.applyUnavaliabilityToSeats);
