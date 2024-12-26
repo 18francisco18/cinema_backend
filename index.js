@@ -50,6 +50,8 @@ app.use(CORS({
 
 // Middleware para cookies e JSON
 app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
