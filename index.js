@@ -11,12 +11,13 @@ const errorHandler = require(`./middleware/errorHandler`);
 
 const config = require("./config");
 
-const port = process.env.PORT || 3000;
+// Use a porta fornecida pelo Azure (process.env.PORT) ou 8080 como fallback
+const port = process.env.PORT || 8080;
 
 mongoose
   .connect(config.db)
-  .then(() => console.log("Connection successful!"))
-  .catch((err) => console.error(err));
+  .then(() => console.log("MongoDB Connection successful!"))
+  .catch((err) => console.error("MongoDB Connection error:", err));
 
 let router = require(`./server/${apiVersion}/router`);
 var app = express();
@@ -74,8 +75,12 @@ cron.schedule('0 * * * *', () => {
 });
 
 app.use(errorHandler)
-const server = http.Server(app);
+
+// Criar e iniciar o servidor
+const server = http.createServer(app);
 
 server.listen(port, () => {
-  console.log(`Server running on port ${port} with API version: ${apiVersion}`);
+  console.log(`Server is running on port ${port}`);
+  console.log(`API Version: ${apiVersion}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
 });
