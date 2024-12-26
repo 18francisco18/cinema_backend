@@ -1,0 +1,30 @@
+# Arquivos de desenvolvimento
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Diretórios de dependências
+node_modules/
+jspm_packages/
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db

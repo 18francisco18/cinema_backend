@@ -5,8 +5,9 @@ const CORS = require("cors");
 const cookieParser = require('cookie-parser');
 const sessionService = require("./data/sessions");
 const discountService = require("./data/discounts");
-const apiVersion = process.env.API_VERSION;
+const apiVersion = process.env.API_VERSION || 'v1';
 const errorHandler = require(`./middleware/errorHandler`);
+const path = require('path');
 
 const config = require("./config");
 
