@@ -11,8 +11,7 @@ const errorHandler = require(`./middleware/errorHandler`);
 
 const config = require("./config");
 
-const hostname = "127.0.0.1";
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 mongoose
   .connect(config.db)
@@ -28,7 +27,6 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // Limite de 100 requisições por IP
 });
-
 
 // Configuração do CORS
 const allowedOrigins = [
@@ -52,8 +50,6 @@ app.use(CORS({
 
 // Middleware para cookies e JSON
 app.use(cookieParser());
-
-
 
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
@@ -80,6 +76,6 @@ cron.schedule('0 * * * *', () => {
 app.use(errorHandler)
 const server = http.Server(app);
 
-server.listen(port, hostname, () => {
-  console.log(`Server running at http://${hostname}:${port} with API version: ${apiVersion}`);
+server.listen(port, () => {
+  console.log(`Server running on port ${port} with API version: ${apiVersion}`);
 });
