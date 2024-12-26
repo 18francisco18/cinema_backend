@@ -68,25 +68,13 @@ const limiter = rateLimit({
   max: 100, // Limite de 100 requisições por IP
 });
 
-// Configuração do CORS
-const allowedOrigins = [
-  'http://localhost:4000',
-  'https://cinema-backend-app.azurewebsites.net',
-  'https://cinema-frontend-app.azurewebsites.net'
-];
-
+// Configurar CORS
 app.use(CORS({
-  origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Permite todas as origens
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['Set-Cookie'],
-  credentials: true
+  exposedHeaders: ['Set-Cookie']
 }));
 
 // Middleware para cookies e JSON
