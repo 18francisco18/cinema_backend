@@ -25,12 +25,33 @@ console.log('Config loaded:', {
     API_VERSION: config.API_VERSION
 });
 
+// Verificar variáveis de ambiente críticas apenas em produção
+const requiredEnvVars = process.env.NODE_ENV === 'production' ? [
+  'MONGODB_URI',
+  'MOVIE_API_KEY',
+  'SECRET_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'EMAIL_ADDRESS',
+  'EMAIL_PASSWORD',
+  'SENDGRID_API_KEY',
+  'EMAIL_FROM'
+] : [];
+
+if (requiredEnvVars.length > 0) {
+  const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  if (missingEnvVars.length > 0) {
+    console.error('Missing required environment variables:', missingEnvVars);
+    process.exit(1);
+  }
+}
+
 mongoose
   .connect(config.db)
   .then(() => console.log("MongoDB Connection successful!"))
   .catch((err) => {
     console.error("MongoDB Connection error:", err);
-    process.exit(1); // Exit if cannot connect to MongoDB
+    process.exit(1);
   });
 
 // Importar o router do local correto
@@ -102,11 +123,21 @@ const port = process.env.PORT || 8080;
 const host = '0.0.0.0';
 console.log(`Attempting to start server on ${host}:${port}...`);
 
-app.listen(port, host, () => {
+const server = app.listen(port, host, () => {
     console.log(`Server is running on ${host}:${port}`);
     console.log(`API Version: ${apiVersion}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('Server startup complete!');
 }).on('error', (err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
+});
+
+// Adicionar handler para SIGTERM
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received. Closing server...');
+  server.close(() => {
+    console.log('Server closed. Exiting process...');
+    process.exit(0);
+  });
 });
