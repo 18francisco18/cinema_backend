@@ -31,8 +31,19 @@ const limiter = rateLimit({
 
 
 // Configuração do CORS
+const allowedOrigins = [
+  'http://localhost:4000',
+  'https://your-frontend-app.azurewebsites.net' // Add your Azure frontend URL when deployed
+];
+
 app.use(CORS({
-  origin: 'http://localhost:4000',
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   exposedHeaders: ['Set-Cookie'],
