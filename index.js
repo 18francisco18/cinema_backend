@@ -16,7 +16,9 @@ mongoose
   .then(() => console.log("MongoDB Connection successful!"))
   .catch((err) => console.error("MongoDB Connection error:", err));
 
-let router = require(`./server/${apiVersion}/router`);
+// Importar o router do local correto
+const router = require(`./server/v1/router`);
+
 var app = express();
 
 // Limitador de requisições
