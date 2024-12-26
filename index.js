@@ -43,6 +43,7 @@ app.use(CORS({
 app.use(cookieParser());
 
 
+
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
 app.use(limiter);
