@@ -1,7 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cron = require("node-cron");
-const CORS = require("cors");
+const cors = require("cors");
 const cookieParser = require('cookie-parser');
 const sessionService = require("./data/sessions");
 const discountService = require("./data/discounts");
@@ -61,46 +61,58 @@ console.log('Router loaded successfully');
 
 var app = express();
 
-// Limitador de requisições
-const rateLimit = require("express-rate-limit");
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Limite de 100 requisições por IP
-});
-
-// Configurar CORS
+// Configurar CORS - deve ser o primeiro middleware
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:4000',
   'http://localhost:5173',
-  'https://cinemaclub-snowy.vercel.app'
+  'https://cinemaclub-snowy.vercel.app',
+  'https://cinema-frontend-gamma.vercel.app'
 ];
 
-app.use(CORS({
-  origin: function(origin, callback) {
-    // Permitir requisições sem origin (como mobile apps ou curl)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('Origin not allowed:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-XSRF-TOKEN'],
-  exposedHeaders: ['Set-Cookie']
-}));
+// Middleware para CORS (funcionará tanto no Render quanto localmente)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Log para debug
+  console.log('Request origin:', origin);
+  console.log('Allowed origins:', allowedOrigins);
+  
+  // Permitir origens específicas
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-XSRF-TOKEN');
+    res.header('Access-Control-Expose-Headers', 'Set-Cookie');
+  }
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
 
 // Middleware para cookies e JSON
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Limitador de requisições
+const rateLimit = require("express-rate-limit");
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100 // Limite de 100 requisições por IP
+});
+
+// Aplicar rate limit após CORS
+app.use(limiter);
+
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
-app.use(limiter);
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos
 // ATENÇÃO: A razão do uso do node-cron é explicada no arquivo service.js de sessions,

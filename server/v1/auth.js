@@ -88,14 +88,12 @@ const AuthRouter = () => {
       .then((login) => {
         console.log("Login token:", login.token);
         
-        // Define o cookie com configurações mais seguras
+        // Define o cookie com configurações mais simples
         res.cookie("token", login.token, {
           httpOnly: true,
-          secure: true, // Sempre true para garantir HTTPS
-          sameSite: 'none', // Permite cookies em requisições cross-site
-          path: "/",
-          maxAge: 24 * 60 * 60 * 1000, // 24 hours
-          domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+          secure: true,
+          sameSite: 'none',
+          maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
         console.log("Cookie definido:", {
@@ -104,9 +102,7 @@ const AuthRouter = () => {
             httpOnly: true,
             secure: true,
             sameSite: 'none',
-            path: "/",
-            maxAge: 24 * 60 * 60 * 1000,
-            domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+            maxAge: 24 * 60 * 60 * 1000
           },
         });
 
@@ -126,9 +122,7 @@ const AuthRouter = () => {
     res.clearCookie("token", {
       httpOnly: true,
       secure: true,
-      sameSite: 'none',
-      path: "/",
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+      sameSite: 'none'
     });
     res.status(200).send({ message: "Logged out successfully" });
   });
