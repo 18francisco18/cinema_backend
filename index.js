@@ -119,7 +119,7 @@ cron.schedule('0 * * * *', () => {
 app.use(errorHandler)
 
 // Iniciar o servidor
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3000;
 const host = '0.0.0.0';
 console.log(`Attempting to start server on ${host}:${port}...`);
 
