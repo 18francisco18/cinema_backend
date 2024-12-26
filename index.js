@@ -73,4 +73,10 @@ cron.schedule('0 * * * *', () => {
 
 app.use(errorHandler)
 
-module.exports = app;
+// Iniciar o servidor
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+    console.log(`API Version: ${apiVersion}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
