@@ -87,23 +87,29 @@ const AuthRouter = () => {
       })
       .then((login) => {
         console.log("Login token:", login.token);
+        
+        // Define o cookie com configurações mais seguras
         res.cookie("token", login.token, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
+          secure: true, // Sempre true para garantir HTTPS
+          sameSite: 'none', // Permite cookies em requisições cross-site
           path: "/",
           maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
         });
+
         console.log("Cookie definido:", {
           token: login.token,
           options: {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            secure: true,
+            sameSite: 'none',
             path: "/",
             maxAge: 24 * 60 * 60 * 1000,
+            domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
           },
         });
+
         res.status(200).send({
           token: login.token,
           userId: login.userId,
@@ -119,25 +125,25 @@ const AuthRouter = () => {
   router.route("/logout").post(function (req, res) {
     res.clearCookie("token", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true,
+      sameSite: 'none',
       path: "/",
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
     });
     res.status(200).send({ message: "Logged out successfully" });
   });
 
   router.route("/me").get(VerifyToken, async function (req, res) {
     try {
-      const token = req.cookies.token || req.headers["authorization"];
-      const decoded = await new Promise((resolve, reject) => {
-        jwt.verify(token, config.secret, function (err, decoded) {
-          if (err) reject(err);
-          resolve(decoded);
-        });
-      });
+      // Tenta pegar o token do cookie primeiro, depois do header
+      const token = req.cookies.token || req.headers["authorization"]?.replace('Bearer ', '');
+      
+      if (!token) {
+        return res.status(401).send({ auth: false, message: "No token provided." });
+      }
 
       // Fetch complete user data from database
-      const user = await User.findById(decoded.id);
+      const user = await User.findById(token.id);
       if (!user) {
         return res
           .status(404)
