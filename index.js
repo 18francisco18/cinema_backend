@@ -125,7 +125,7 @@ console.log(`Attempting to start server on ${host}:${port}...`);
 
 const server = app.listen(port, host, () => {
     console.log(`Server is running on ${host}:${port}`);
-    console.log(`API Version: ${apiVersion}`);
+    console.log(`API Version: ${config.API_VERSION}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log('Server startup complete!');
 }).on('error', (err) => {
