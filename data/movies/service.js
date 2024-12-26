@@ -1,6 +1,6 @@
 const axios = require("axios");
 const mongoose = require("mongoose");
-const { MOVIE_API_BASE_URL, MOVIE_API_KEY } = require("../../api");
+const config = require("../../config");
 const {
   ValidationError,
   AuthenticationError,
@@ -53,13 +53,13 @@ function MovieService(movieModel) {
       //como parametros no pedido à API, pois a API OMDb permite pesquisar filmes por título e ano.
       //O pedido é feito com o método GET para a URL base da API OMDb (MOVIE_API_BASE_URL) e os parâmetros t e y.
       //É necessário passar a chave da API (MOVIE_API_KEY) como parâmetro apikey.
-      const response = await axios.get(`${MOVIE_API_BASE_URL}`, {
+      const response = await axios.get(`${config.MOVIE_API_BASE_URL}`, {
         params: {
           t: title, // Título do filme
           y: year, // Ano do filme (opcional)
           //plot ter valores: short, full
           plot: plot, // Tipo de plot
-          apikey: MOVIE_API_KEY, // Chave da API
+          apikey: config.MOVIE_API_KEY, // Chave da API
         },
       });
 
@@ -138,7 +138,6 @@ function MovieService(movieModel) {
   async function findAll(page = 1, limit = 10, query = {}, sort = {}) {
     try {
       const skip = (page - 1) * limit;
-
 
       // Buscar os filmes com filtros, paginação e ordenação
       const movies = await movieModel
