@@ -31,7 +31,8 @@ const limiter = rateLimit({
 // Configuração do CORS
 const allowedOrigins = [
   'http://localhost:4000',
-  'https://your-frontend-app.azurewebsites.net' // Add your Azure frontend URL when deployed
+  'https://cinema-backend-app.azurewebsites.net',
+  'https://cinema-frontend-app.azurewebsites.net'
 ];
 
 app.use(CORS({
@@ -79,7 +80,7 @@ app.use(errorHandler)
 
 // Iniciar o servidor
 const port = process.env.PORT || 8080;
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);
     console.log(`API Version: ${apiVersion}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
