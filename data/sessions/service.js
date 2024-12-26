@@ -7,6 +7,9 @@ const sessionStatus = require("./sessionStatus");
 const sessionReport = require("./sessionReport");
 const booking = require("../booking/booking");
 const ticketModel = require("../tickets/tickets");
+const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const {
   ValidationError,
   AuthenticationError,
@@ -33,6 +36,7 @@ function SessionService(sessionModel) {
     getAllSessionReports,
     getReportFromSession,
     findSessionsByDateRange,
+    downloadSessionReport,
   };
 
   // Função para criar uma sessão, copiando o layout da Room para os assentos da Session
@@ -455,8 +459,11 @@ function SessionService(sessionModel) {
         return count;
       }, 0);
 
-      // Calcular o total de bilhetes vendidos para todas as sessões
-      const totalTicketsSold = await ticketModel.countDocuments();
+      // Calcular o total de bilhetes vendidos para a sessão
+      const totalTicketsSold = await ticketModel.countDocuments({
+        session: sessionId,
+        status: "booked",
+      });
 
       // Calcular o total de cancelamentos
       const cancellationsTotal = tickets.filter(
@@ -517,28 +524,47 @@ function SessionService(sessionModel) {
         .flat()
         .filter((seat) => seat.status === "available").length;
 
-      // Criar um novo relatório de sessão com os dados calculados
-      const newSessionReport = new sessionReport({
-        sessionId: sessionId,
-        sessionTicketPrice: session.price,
-        ticketsSold: ticketsSold,
-        totalTicketsSold: totalTicketsSold,
-        cancellationsTotal: cancellationsTotal,
-        cancellationsPeriods: cancellationsPeriods,
-        ticketAmountGenerated: ticketAmountGenerated,
-        cancellationAmountGenerated: cancellationAmountGenerated,
-        totalAmountGenerated: totalAmountGenerated,
-        totalProductsSold: totalProductsSold,
-        totalProductsAmountGenerated: totalProductsAmountGenerated[0].total,
-        seatsUnsold: seatsUnsold,
-      });
+      // Procurar sessionReport com o ID da sessão
+      let existingReport = await sessionReport.findOne({ sessionId: sessionId });
+      // Se já existir um relatório para a sessão, atualizar os dados
+      if (existingReport) {
+        console.log("Atualizando relatório existente...");
+        existingReport.sessionTicketPrice = session.price;
+        existingReport.ticketsSold = ticketsSold;
+        existingReport.totalTicketsSold = totalTicketsSold;
+        existingReport.cancellationsTotal = cancellationsTotal;
+        existingReport.cancellationsPeriods = cancellationsPeriods;
+        existingReport.ticketAmountGenerated = ticketAmountGenerated;
+        existingReport.cancellationAmountGenerated = cancellationAmountGenerated;
+        existingReport.totalAmountGenerated = totalAmountGenerated;
+        existingReport.totalProductsSold = totalProductsSold;
+        existingReport.totalProductsAmountGenerated = totalProductsAmountGenerated[0].total;
+        existingReport.seatsUnsold = seatsUnsold;
+      } else {
+        console.log("Criando novo relatório...");
+        // Se não existir um relatório para a sessão, criar um novo
+        existingReport = new sessionReport({
+          sessionId: sessionId,
+          sessionTicketPrice: session.price,
+          ticketsSold: ticketsSold,
+          totalTicketsSold: totalTicketsSold,
+          cancellationsTotal: cancellationsTotal,
+          cancellationsPeriods: cancellationsPeriods,
+          ticketAmountGenerated: ticketAmountGenerated,
+          cancellationAmountGenerated: cancellationAmountGenerated,
+          totalAmountGenerated: totalAmountGenerated,
+          totalProductsSold: totalProductsSold,
+          totalProductsAmountGenerated: totalProductsAmountGenerated[0].total,
+          seatsUnsold: seatsUnsold,
+        });
+        
+        console.log(existingReport);
+      }
 
-      console.log(newSessionReport);
+      // Salvar o novo relatório no banco de dados
+      await existingReport.save();
 
-      // Salvar o relatório de sessão no banco de dados
-      await newSessionReport.save();
-
-      return newSessionReport;
+      return existingReport;
     } catch (error) {
       console.log(error);
 
@@ -557,6 +583,7 @@ function SessionService(sessionModel) {
       if (!session) {
         throw new NotFoundError("Session not found");
       }
+      
       let report = await sessionReport.find({ sessionId: session });
       if (!report) {
         throw new NotFoundError("Report not found");
@@ -583,6 +610,132 @@ function SessionService(sessionModel) {
 
       return sessions;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // Descarregar uma sessionReport
+  async function downloadSessionReport(sessionId) {
+    let session = await sessionModel.findById(sessionId);
+    if (!session) {
+      throw new NotFoundError("Session not found");
+    }
+
+    console.log("Session ID:", session);
+
+    // Buscar o relatório da sessão com o ID da sessão e o timestamp mais recente
+    let report = await sessionReport.findOne({ sessionId: session._id }).sort({
+      reportGeneratedAt: -1 // Ordenar por timestamp mais recente
+    });
+
+    if (!report) {
+      throw new NotFoundError("Report not found");
+    }
+
+    let pdfPath = null;
+    try {
+      // Criar o caminho para a pasta de relatórios
+      const sessionReportsPath = path.join(
+        process.cwd(), // Usa o diretório atual do projeto
+        "relatorios_sessoes"
+      );
+
+      // Verificar se a pasta 'relatorios_vendas' existe; caso contrário, criá-la
+      if (!fs.existsSync(sessionReportsPath)) {
+        fs.mkdirSync(sessionReportsPath, { recursive: true });
+      }
+
+      // Gerar o caminho completo para o arquivo PDF
+      pdfPath = path.join(
+        sessionReportsPath,
+        `session_report_${report.sessionId}.pdf`
+      );
+
+      console.log('Gerando PDF em:', pdfPath);
+
+      // Criar o PDF do relatório
+      const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50
+      });
+
+      // Criar write stream e pipe
+      const stream = fs.createWriteStream(pdfPath);
+      doc.pipe(stream);
+
+      // Layout do cabeçalho com logo e título lado a lado
+      const logoPath = path.join(process.cwd(), "assets", "logoCinemaClub.jpeg");
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 50, 50, {
+          fit: [100, 100]
+        });
+        doc.font('Helvetica-Bold')
+           .fontSize(25)
+           .text("Relatório de Sessão", 170, 85);
+      } else {
+        doc.font('Helvetica-Bold')
+           .fontSize(25)
+           .text("Relatório de Sessão", { align: "center" });
+      }
+
+      // Linha decorativa abaixo do cabeçalho
+      doc.moveTo(50, 170)
+         .lineTo(545, 170)
+         .stroke();
+
+      // Mover para a posição inicial do conteúdo
+      doc.y = 200;
+
+      // Função auxiliar para adicionar campos
+      function addField(label, value) {
+        doc.font('Helvetica-Bold')
+           .fontSize(14)
+           .text(label + ":", { continued: true })
+           .font('Helvetica')
+           .text(" " + value);
+        doc.moveDown(0.5);
+      }
+
+      // Informações do Relatório
+      addField("ID da Sessão", report.sessionId);
+      addField("Preço dos Tickets", report.sessionTicketPrice);
+      addField("Tickets Vendidos", report.ticketsSold);
+      addField("Total de Tickets Vendidos", report.totalTicketsSold);
+      addField("Total de Cancelamentos", report.cancellationsTotal);
+      // Adicionar campos do período de cancelamentos
+      doc.font('Helvetica-Bold').fontSize(14).text("Período de Cancelamentos:");
+      doc.font('Helvetica').fontSize(12).list([
+        `Antes de 2 horas: ${report.cancellationsPeriods.before2Hours}`,
+        `Entre 2 horas e 30 minutos: ${report.cancellationsPeriods.between2HoursAnd30Minutes}`,
+        `Depois de 30 minutos: ${report.cancellationsPeriods.after30Minutes}`
+      ]);
+      doc.moveDown(0.5);
+      addField("Montante Gerado com Tickets", report.ticketAmountGenerated);
+      addField("Montante Gerado com Cancelamentos", report.cancellationAmountGenerated);
+      addField("Montante Total Gerado", report.totalAmountGenerated);
+      addField("Assentos Não Vendidos", report.seatsUnsold);
+      addField("Total de Produtos Vendidos", report.totalProductsSold);
+      addField("Montante Total Gerado com Produtos", report.totalProductsAmountGenerated);
+      addField("Relatório Gerado em", report.reportGeneratedAt);
+
+      // Linha decorativa final
+      doc.moveDown();
+      doc.moveTo(50, doc.y)
+         .lineTo(545, doc.y)
+         .stroke();
+
+      // Finalizar o documento e esperar o stream terminar
+      await new Promise((resolve, reject) => {
+        stream.on('finish', resolve);
+        stream.on('error', reject);
+        doc.end();
+      });
+
+      console.log('PDF gerado com sucesso em:', pdfPath);
+      return pdfPath;
+
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
       throw error;
     }
   }
