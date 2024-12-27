@@ -29,19 +29,23 @@ function BookingRouter() {
     "/webhook",
     express.raw({ type: 'application/json' }),
     async (req, res) => {
-      console.log("Webhook received:", req.headers["stripe-signature"]);
       const sig = req.headers["stripe-signature"];
-      let event;
+      console.log("Webhook received:", sig);
+      
+      if (!sig) {
+        console.error("No stripe signature found");
+        return res.status(400).send("No stripe signature found");
+      }
 
+      let event;
       try {
         console.log("Constructing Stripe event...");
-        // Verificar a assinatura e decodificar o evento enviado pelo Stripe
         event = stripe.webhooks.constructEvent(
           req.body,
           sig,
           process.env.STRIPE_WEBHOOK_SECRET
         );
-        console.log("Webhook event type:", event.type);
+        console.log("Webhook event constructed successfully:", event.type);
       } catch (err) {
         console.error("Erro ao verificar assinatura do webhook:", err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);

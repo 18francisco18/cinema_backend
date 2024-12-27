@@ -98,8 +98,6 @@ app.use((req, res, next) => {
 
 // Middleware para cookies e JSON
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Limitador de requisições
 const rateLimit = require("express-rate-limit");
@@ -113,6 +111,18 @@ app.use(limiter);
 
 // Rotas da API
 app.use(router.init(`/api/${apiVersion}`));
+
+// Configurar o parsing do body para todas as rotas exceto o webhook
+app.use((req, res, next) => {
+  if (req.originalUrl === `/api/${apiVersion}/bookings/webhook`) {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
+
+// Middleware para URL encoded
+app.use(express.urlencoded({ extended: true }));
 
 // Cron job que verifica e atualiza estados das sessões a cada 5 minutos
 // ATENÇÃO: A razão do uso do node-cron é explicada no arquivo service.js de sessions,
