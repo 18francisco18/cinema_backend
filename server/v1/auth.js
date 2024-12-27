@@ -129,15 +129,15 @@ const AuthRouter = () => {
 
   router.route("/me").get(VerifyToken, async function (req, res) {
     try {
-      // Tenta pegar o token do cookie primeiro, depois do header
-      const token = req.cookies.token || req.headers["authorization"]?.replace('Bearer ', '');
+      // Use the userId from the middleware instead of trying to decode the token again
+      const userId = req.userId;
       
-      if (!token) {
-        return res.status(401).send({ auth: false, message: "No token provided." });
+      if (!userId) {
+        return res.status(401).send({ auth: false, message: "No user ID found." });
       }
 
       // Fetch complete user data from database
-      const user = await User.findById(token.id);
+      const user = await User.findById(userId);
       if (!user) {
         return res
           .status(404)
@@ -156,9 +156,10 @@ const AuthRouter = () => {
 
       res.status(200).send(userData);
     } catch (err) {
+      console.error("Error in /auth/me:", err);
       return res
         .status(500)
-        .send({ auth: false, message: "Failed to authenticate token." });
+        .send({ auth: false, message: "Failed to get user data." });
     }
   });
 
