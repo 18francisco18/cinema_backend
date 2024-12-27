@@ -8,10 +8,26 @@ const Booking = require("../../data/booking/booking"); // Importando o modelo co
 function BookingRouter() {
   let router = express();
 
+  // Outros middlewares gerais para as demais rotas
+  router.use((req, res, next) => {
+    if (req.originalUrl === '/api/v1/bookings/webhook') {
+      next();
+    } else {
+      bodyParser.json({ limit: "100mb" })(req, res, next);
+    }
+  });
+  router.use((req, res, next) => {
+    if (req.originalUrl === '/api/v1/bookings/webhook') {
+      next();
+    } else {
+      bodyParser.urlencoded({ limit: "100mb", extended: true })(req, res, next);
+    }
+  });
+
   // Rota do webhook do Stripe, com o middleware específico primeiro
   router.post(
     "/webhook",
-    bodyParser.raw({ type: "application/json" }),
+    express.raw({ type: 'application/json' }),
     async (req, res) => {
       console.log("Webhook received:", req.headers["stripe-signature"]);
       const sig = req.headers["stripe-signature"];
@@ -128,10 +144,6 @@ function BookingRouter() {
       res.json({ received: true });
     }
   );
-
-  // Outros middlewares gerais para as demais rotas
-  router.use(bodyParser.json({ limit: "100mb" }));
-  router.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 
   // Outras rotas normais
   router.get("/find/:id", bookingController.getBookingById);
