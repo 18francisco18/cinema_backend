@@ -550,8 +550,12 @@ function bookingService(bookingModel) {
             roomId: session.room._id.toString(), // Convertendo para string
           },
         },
-        success_url: "http://localhost:4000/success", // Redirecionamento após o sucesso
-        cancel_url: "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
+        success_url: process.env.NODE_ENV === 'production' 
+          ? "https://cinemaclub-snowy.vercel.app/success"
+          : "http://localhost:4000/success", // Redirecionamento após o sucesso
+        cancel_url: process.env.NODE_ENV === 'production'
+          ? "https://cinemaclub-snowy.vercel.app/cancel"
+          : "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
         line_items: line_items,
         mode: "payment", // Modo de pagamento (apenas para pagamento completo)
       });
