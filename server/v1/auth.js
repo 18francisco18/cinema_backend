@@ -91,8 +91,8 @@ const AuthRouter = () => {
         // Define o cookie com configurações mais simples
         res.cookie("token", login.token, {
           httpOnly: true,
-          secure: true,
-          sameSite: 'none',
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
           maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
@@ -100,8 +100,8 @@ const AuthRouter = () => {
           token: login.token,
           options: {
             httpOnly: true,
-            secure: true,
-            sameSite: 'none',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
             maxAge: 24 * 60 * 60 * 1000
           },
         });
@@ -121,8 +121,8 @@ const AuthRouter = () => {
   router.route("/logout").post(function (req, res) {
     res.clearCookie("token", {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none'
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     });
     res.status(200).send({ message: "Logged out successfully" });
   });
