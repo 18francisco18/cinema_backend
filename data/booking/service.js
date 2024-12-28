@@ -14,6 +14,7 @@ const promocodeService = require("../discounts/promocodes/index");
 const QRCodeSchema = require("./qrcode");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
+const Promocode = require("../discounts/promocodes/promocodes");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const {
   ValidationError,
@@ -442,9 +443,21 @@ function bookingService(bookingModel) {
   // Função para criar o pagamento de uma reserva
   async function createPaymentSession(booking) {
     console.log("Creating payment session for booking");
+
     try {
       console.log("Booking:", booking);
-      // Buscar a sessão associada à reserva para obter detalhes como preço.
+
+      // Validar entrada
+      if (
+        !booking ||
+        !booking.user?._id ||
+        !booking.session ||
+        !booking.products
+      ) {
+        throw new ValidationError("Invalid booking data");
+      }
+
+      // Buscar a sessão associada à reserva com detalhes populados
       const session = await sessionModel
         .findById(booking.session)
         .populate("movie")
@@ -456,28 +469,35 @@ function bookingService(bookingModel) {
         });
 
       if (!session) throw new NotFoundError("Session not found");
-      if (!booking.user._id) throw new NotFoundError("User not found");
 
-      const line_items = [];
+      // Buscar todos os produtos e descontos de uma vez para otimizar
+      const productIds = booking.products.map((item) => item.product._id);
+      const products = await Product.find({ _id: { $in: productIds } });
+      const discountIds = products.flatMap(
+        (product) => product.discountRef || []
+      );
+      const discounts = await Discount.find({ _id: { $in: discountIds } });
 
-      // Adicionar cada objeto da array de produtos em booking ao line_items
-      for (const item of booking.products) {
-        const product = await Product.findById(item.product._id);
+      // Mapear produtos e descontos para acesso rápido
+      const productMap = new Map(
+        products.map((product) => [product._id.toString(), product])
+      );
+      const discountMap = new Map(
+        discounts.map((discount) => [discount._id.toString(), discount])
+      );
+
+      // Construir line_items
+      const line_items = booking.products.map((item) => {
+        const product = productMap.get(item.product._id.toString());
         if (!product)
           throw new NotFoundError(`Product not found: ${item.product._id}`);
 
-        console.log(`Product ID: ${product._id}`);
-        console.log(`Current Date: ${new Date()}`);
-
-        // Verificar se o produto tem descontos aplicados
         let productPrice = product.price;
-        console.log(`Product price: ${productPrice}`);
-        console.log(`Product discountRef: ${product.discountRef}`);
-        if (product.discountRef && product.discountRef.length > 0) {
-          console.log("Product has discounts");
-          for (const discountId of product.discountRef) {
-            const discount = await Discount.findById(discountId);
 
+        // Aplicar descontos válidos
+        if (product.discountRef && product.discountRef.length > 0) {
+          product.discountRef.forEach((discountId) => {
+            const discount = discountMap.get(discountId.toString());
             if (
               discount &&
               discount.active &&
@@ -485,23 +505,20 @@ function bookingService(bookingModel) {
               (!discount.endDate || discount.endDate > new Date())
             ) {
               if (discount.percentOff) {
-                productPrice -= Math.round((productPrice * discount.percentOff) / 100).toFixed(2);
-                console.log(`Product price after discount: ${productPrice}`);
+                productPrice -= Math.round(
+                  (productPrice * discount.percentOff) / 100
+                );
               } else if (discount.fixedAmountOff) {
                 productPrice -= discount.fixedAmountOff;
               }
             }
-          }
+          });
         }
 
-        // Verificar se o produto foi redimido com pontos, se sim, o preço é 0
-        // caso contrário, o preço é o preço normal (ou com desconto) do produto
+        // Definir preço final (0 se redimido com pontos)
         const priceToCharge = item.redeemedWithPoints ? 0 : productPrice;
 
-        console.log(`Price to charge: ${priceToCharge}`);
-
-        // Adicionar o produto ao line_items com a quantidade correta
-        line_items.push({
+        return {
           price_data: {
             currency: "eur",
             product_data: {
@@ -509,25 +526,23 @@ function bookingService(bookingModel) {
               description: product.description,
               images: [product.image],
             },
-            unit_amount: priceToCharge * 100, // O Stripe lida com valores em centavos
+            unit_amount: priceToCharge * 100, // Stripe lida com centavos
           },
-          quantity: item.quantity, // Quantidade correta
-        });
-      }
+          quantity: item.quantity,
+        };
+      });
 
-      console.log("Session", session);
-
-      // Adicionar o ingresso ao line_items
+      // Adicionar ingresso ao line_items
       line_items.push({
         price_data: {
           currency: "eur",
           product_data: {
             name: `Movie Ticket for ${session.movie.title}`,
             description: `
-                      Seats: ${booking.seats.join(", ")}
-                      Room: ${session.room.name}
-                      Cinema: ${session.room.cinema.name}
-                  `,
+            Seats: ${booking.seats.join(", ")}
+            Room: ${session.room.name}
+            Cinema: ${session.room.cinema.name}
+          `,
             images: [session.movie.poster],
           },
           unit_amount: session.price * 100,
@@ -535,34 +550,60 @@ function bookingService(bookingModel) {
         quantity: booking.seats.length,
       });
 
-      // Criar a sessão de pagamento no Stripe
+      // Calcular total inicial
+      let totalAmount = line_items.reduce(
+        (total, item) => total + item.price_data.unit_amount * item.quantity,
+        0
+      );
+
+      // Aplicar promocode, se existir
+      if (booking.promocode) {
+        const promocode = await Promocode.findOne({ code: booking.promocode });
+        if (!promocode) throw new ValidationError("Invalid promocode");
+
+        let discountAmount = 0;
+        if (promocode.discountType === "percentage") {
+          discountAmount = totalAmount * (promocode.discount / 100);
+        } else if (promocode.discountType === "fixed") {
+          discountAmount = promocode.discount * 100; // Converter para centavos
+        }
+
+        totalAmount -= discountAmount;
+
+        // Ajustar preços proporcionalmente
+        const discountFactor = totalAmount / (totalAmount + discountAmount);
+        line_items.forEach((item) => {
+          item.price_data.unit_amount = Math.round(
+            item.price_data.unit_amount * discountFactor
+          );
+        });
+      }
+
+      // Criar sessão de pagamento no Stripe
       const paymentSession = await stripe.checkout.sessions.create({
-        payment_method_types: [
-          "card", // Cartão de crédito/débito
-          "multibanco", // Para Multibanco (Portugal)
-        ],
+        payment_method_types: ["card", "multibanco"],
         payment_intent_data: {
           metadata: {
-            bookingId: booking._id.toString(), // Convertendo para string
-            userId: booking.user._id.toString(), // Convertendo para string
-            sessionId: booking.session._id.toString(), // Convertendo para string
-            movieId: session.movie._id.toString(), // Convertendo para string
-            roomId: session.room._id.toString(), // Convertendo para string
+            bookingId: booking._id.toString(),
+            userId: booking.user._id.toString(),
+            sessionId: booking.session.toString(),
+            movieId: session.movie._id.toString(),
+            roomId: session.room._id.toString(),
           },
         },
-        success_url: process.env.NODE_ENV === 'production' 
-          ? "https://cinemaclub-snowy.vercel.app/success"
-          : "http://localhost:4000/success", // Redirecionamento após o sucesso
-        cancel_url: process.env.NODE_ENV === 'production'
-          ? "https://cinemaclub-snowy.vercel.app/cancel"
-          : "http://localhost:4000/cancel", // Redirecionamento após o cancelamento
-        line_items: line_items,
-        mode: "payment", // Modo de pagamento (apenas para pagamento completo)
+        success_url:
+          process.env.NODE_ENV === "production"
+            ? "https://cinemaclub-snowy.vercel.app/success"
+            : "http://localhost:4000/success",
+        cancel_url:
+          process.env.NODE_ENV === "production"
+            ? "https://cinemaclub-snowy.vercel.app/cancel"
+            : "http://localhost:4000/cancel",
+        line_items,
+        mode: "payment",
       });
 
-      console.log("booking._id", booking._id);
-
-      // Agendar a verificação de pagamento após 5 minutos
+      // Agendar verificação de pagamento pendente
       checkingForPendingFiveMinutes(booking._id, paymentSession.payment_intent);
 
       return { url: paymentSession.url };
