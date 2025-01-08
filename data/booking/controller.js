@@ -10,6 +10,7 @@ const bookingController = {
     handlePaymentConfirmation,
     cancelReservation,
     refundTicketsFromBooking,
+    validateQRCode,
 }
 
 
@@ -130,6 +131,17 @@ async function refundTicketsFromBooking(req, res, next) {
   } catch (error) {
     console.log(error);
     next(error);
+  }
+}
+
+async function validateQRCode(req, res, next) {
+  try {
+    const qrCodeData = req.body;
+    const validationResult = await bookingService.validateQRCode(qrCodeData);
+    res.status(200).json({ validationResult });
+  } catch (error) {
+    console.error(error.message);
+    throw error;
   }
 }
 

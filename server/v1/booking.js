@@ -156,6 +156,7 @@ function BookingRouter() {
     "/:sessionId/findAll",
     bookingController.findAllBookingsForSession
   );
+  router.get("/validate-qr-code", bookingController.validateQRCode);
 
   router.put("/update/:id", bookingController.updateBookingById);
 

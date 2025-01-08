@@ -43,6 +43,7 @@ function bookingService(bookingModel) {
     refundPayment,
     refundTickets,
     findAllBookingsForSession,
+    validateQRCode,
   };
 
   // Função para redimir produtos com pontos
@@ -699,6 +700,46 @@ function bookingService(bookingModel) {
     } catch (error) {
       console.error("Erro ao gerar bilhetes e QR Codes:", error);
       throw new DatabaseError("Falha ao gerar bilhetes e QR Codes");
+    }
+  }
+
+  // Função para validar um QR Code
+  async function validateQRCode(qrCodeId, token) {
+    try {
+      // Decodificar o token JWT
+      const decoded = jwt.verify(token, process.env.SECRET_KEY);
+
+      // Verificar se o QR Code existe no banco de dados
+      const qrCodeEntry = await QRCode.findOne({ qrCodeId });
+      if (!qrCodeEntry) {
+        throw new NotFoundError("QR Code not found");
+      }
+
+      // Verificar se o QR Code foi revogado ou já usado
+      if (qrCodeEntry.isRevoked || qrCodeEntry.isUsed) {
+        throw new ValidationError("QR Code is invalid or already used");
+      }
+
+      // Verificar se o token corresponde aos dados armazenados
+      if (qrCodeEntry.signature !== token) {
+        throw new ValidationError("QR Code signature mismatch");
+      }
+
+      // Verificar se o QR Code expirou
+      if (new Date() > new Date(qrCodeEntry.expirationDate)) {
+        throw new ValidationError("QR Code has expired");
+      }
+
+      // Marcar o QR Code como usado
+      qrCodeEntry.isUsed = true;
+      qrCodeEntry.usedAt = new Date();
+      await qrCodeEntry.save();
+
+      // Retornar os dados decodificados
+      return decoded.qrData;
+    } catch (error) {
+      console.error("Erro ao validar o QR Code:", error);
+      throw new ValidationError("Falha ao validar o QR Code");
     }
   }
 
