@@ -11,9 +11,9 @@ function SessionsRouter() {
   router.get("/find-all", sessionsController.getSessions);
   router.get("/by-date", sessionsController.getSessionsByDate);
   router.get("/movie/:movieId", sessionsController.getSessionsByMovie);
+  router.get("/getAll", sessionsController.getAllSessionReports);
   router.get("/:id", sessionsController.getSessionById);
   router.get("/:sessionId/get-session-report", sessionsController.getSessionsReport);
-  router.get("/getAll", sessionsController.getAllSessionReports);
   router.get("/:sessionId/getReport", sessionsController.getReport);
   router.get("/:sessionId/summonSessionReport", sessionsController.summonSessionReport);
   
