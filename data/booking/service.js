@@ -193,7 +193,7 @@ function bookingService(bookingModel) {
       console.log("Total amount:", totalAmount);
 
       // Aplicar o promocode, se fornecido
-      if (booking.promocode) {
+      if (booking.promocodes && booking.promocodes.length > 0) {
         totalAmount = await promocodeService.applyPromocode(
           booking,
           totalAmount

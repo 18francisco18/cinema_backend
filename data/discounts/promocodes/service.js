@@ -144,60 +144,69 @@ function promocodeService(promocodeModel) {
     // Aplicada no service de booking
     async function applyPromocode(booking, totalAmount) {
       try {
-        const promocode = await promocodeModel.findOne({ code: booking.promocode });
+        for (const promocodeCode of booking.promocodes) {
+          const promocode = await promocodeModel.findOne({
+            code: promocodeCode,
+          });
 
-        if (!promocode) {
-          throw new ValidationError("This promocode does not exist.");
+          if (!promocode) {
+            throw new ValidationError(
+              `Promocode ${promocodeCode} does not exist.`
+            );
+          }
+
+          // Verificar validade e ativação
+          const now = new Date();
+          if (promocode.endDate < now) {
+            throw new ValidationError(`Promocode ${promocodeCode} expired`);
+          }
+
+          // Verificar se o promocode está ativo
+          if (!promocode.active) {
+            throw new ValidationError(`Promocode ${promocodeCode} inactive.`);
+          }
+
+          // Verificar tipo e uso
+          if (promocode.type === "one-time") {
+            if (promocode.usedBy.includes(booking.user)) {
+              throw new ValidationError(
+                `Promocode ${promocodeCode} already used by this user.`
+              );
+            }
+          }
+
+          // Verificar se o promocode pode ser aplicado ao produto
+          if (promocode.maxUsage && promocode.maxUsage < 1) {
+            throw new ValidationError(
+              `Promocode ${promocodeCode} max usage reached.`
+            );
+          }
+
+          // Aplicar desconto
+          if (promocode.discountType === "percentage") {
+            totalAmount = (
+              totalAmount -
+              totalAmount * (promocode.discount / 100)
+            ).toFixed(2);
+            totalAmount = parseFloat(totalAmount);
+          } else if (promocode.discountType === "fixed") {
+            totalAmount -= promocode.discount;
+          }
+
+          // Garantir que o preço não fique negativo
+          totalAmount = Math.max(totalAmount, 0);
+
+          if (promocode.maxUsage) {
+            promocode.maxUsage--;
+          }
+
+          // Adicionar utilizador à lista de usos
+          promocode.usedBy.push(booking.user);
+
+          await promocode.save();
         }
 
-        // Verificar validade e ativação
-        const now = new Date();
-        if (promocode.endDate < now) {
-          throw new ValidationError("Promocode expired");
-        }
-
-        // Verificar se o promocode está ativo
-        if (!promocode.active) {
-          throw new ValidationError("Promocode inactive.");
-        }
-
-        
-        // Verificar tipo e uso
-        if (promocode.type === "one-time") {
-          if (promocode.usedBy.includes(booking.user)) {
-            throw new ValidationError("Promocode already used by this user.");
-          } 
-        }
-
-        // Verificar se o promocode pode ser aplicado ao produto
-        if (promocode.maxUsage && promocode.maxUsage < 1) {
-          throw new ValidationError("Promocode max usage reached.");
-        }
-
-        // Aplicar desconto
-        if (promocode.discountType === "percentage") {
-          totalAmount = (
-            totalAmount -
-            totalAmount * (promocode.discount / 100)
-          ).toFixed(2);
-          totalAmount = parseFloat(totalAmount);
-        } else if (promocode.discountType === "fixed") {
-          totalAmount -= promocode.discount;
-        }
-
-        // Garantir que o preço não fique negativo
-        totalAmount = Math.max(totalAmount, 0);
-
-        if (promocode.maxUsage) {
-          promocode.maxUsage--;
-        }
-
-        // Adicionar utilizador à lista de usos
-        promocode.usedBy.push(booking.user);
-
-        await promocode.save();
-
-        return totalAmount ;
+        return totalAmount;
       } catch (error) {
         console.error("Error applying promocode:", error);
         throw new ValidationError(
