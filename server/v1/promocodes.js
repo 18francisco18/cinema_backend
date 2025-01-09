@@ -13,6 +13,8 @@ function PromocodesRouter() {
 
     router.post("/create", promocodeController.createPromocode);
 
+    router.post("/changePromocodeValueFrontend", promocodeController.changePromocodeValueFrontend);
+
 
     router.patch("/markAsInactive/:id", promocodeController.markPromocodeAsInactive);
     router.patch("/markAsActive/:id", promocodeController.markPromocodeAsActive);

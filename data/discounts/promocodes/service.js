@@ -23,6 +23,7 @@ function promocodeService(promocodeModel) {
         updatePromocode,
         deletePromocode,
         applyPromocode,
+        changePromocodeValueFrontend,
     }
 
     async function createPromocode(promocode) {
@@ -146,34 +147,31 @@ function promocodeService(promocodeModel) {
         const promocode = await promocodeModel.findOne({ code: booking.promocode });
 
         if (!promocode) {
-          return { success: false, message: "Promocode not found" };
+          throw new ValidationError("This promocode does not exist.");
         }
 
         // Verificar validade e ativação
         const now = new Date();
         if (promocode.endDate < now) {
-          return { success: false, message: "Promocode expired" };
+          throw new ValidationError("Promocode expired");
         }
 
         // Verificar se o promocode está ativo
         if (!promocode.active) {
-          return { success: false, message: "Promocode inactive" };
+          throw new ValidationError("Promocode inactive.");
         }
 
         
         // Verificar tipo e uso
         if (promocode.type === "one-time") {
           if (promocode.usedBy.includes(booking.user)) {
-            return {
-              success: false,
-              message: "Promocode already used by this user",
-            };
+            throw new ValidationError("Promocode already used by this user.");
           } 
         }
 
         // Verificar se o promocode pode ser aplicado ao produto
         if (promocode.maxUsage && promocode.maxUsage < 1) {
-          return { success: false, message: "Promocode max usage reached" };
+          throw new ValidationError("Promocode max usage reached.");
         }
 
         // Aplicar desconto
@@ -202,10 +200,51 @@ function promocodeService(promocodeModel) {
         return totalAmount ;
       } catch (error) {
         console.error("Error applying promocode:", error);
-        return {
-          success: false,
-          message: "An error occurred while applying the promocode",
-        };
+        throw new ValidationError(
+          "An error occurred while applying the promocode."
+        );
+      }
+    }
+
+    async function changePromocodeValueFrontend(promocodeCode, totalAmount) {
+      try {
+        const promocode = await promocodeModel.findOne({ code: promocodeCode });
+
+        if (!promocode) {
+          throw new ValidationError("This promocode does not exist.");
+        }
+
+        // Verificar validade e ativação
+        const now = new Date();
+        if (promocode.endDate < now) {
+          throw new ValidationError("Promocode expired");
+        }
+
+        // Verificar se o promocode está ativo
+        if (!promocode.active) {
+          throw new ValidationError("Promocode inactive.");
+        }
+
+        // Aplicar desconto
+        if (promocode.discountType === "percentage") {
+          totalAmount = (
+            totalAmount -
+            totalAmount * (promocode.discount / 100)
+          ).toFixed(2);
+          totalAmount = parseFloat(totalAmount);
+        } else if (promocode.discountType === "fixed") {
+          totalAmount -= promocode.discount;
+        }
+
+        // Garantir que o preço não fique negativo
+        totalAmount = Math.max(totalAmount, 0);
+
+        return { message: "Promocode applied successfully", totalAmount };
+      } catch (error) {
+        console.error("Error validating promocode:", error);
+        throw new ValidationError(
+          "An error occurred while validating the promocode."
+        );
       }
     }
 

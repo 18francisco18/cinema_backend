@@ -9,6 +9,7 @@ const promocodeController = {
     findAllPromocodes,
     updatePromocode,
     deletePromocode,
+    changePromocodeValueFrontend,
 }
 
 
@@ -77,6 +78,16 @@ async function deletePromocode(req, res, next) {
         const { id } = req.params;
         await promocodeService.deletePromocode(id);
         res.status(204).end();
+    } catch (error) {
+        next();
+    }
+}
+
+async function changePromocodeValueFrontend(req, res, next) {
+    try {
+        const { code, totalAmount } = req.body;
+        const promocode = await promocodeService.changePromocodeValueFrontend(code, totalAmount);
+        res.status(200).json(promocode);
     } catch (error) {
         next();
     }
