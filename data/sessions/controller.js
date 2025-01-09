@@ -145,11 +145,11 @@ async function getAllSessionReports(req, res, next) {
     console.log('Buscando todos os relatórios de sessão...');
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
+    const filters = req.query.filters ? JSON.parse(req.query.filters) : {};
 
     
 
-    const result = await sessionService.getAllSessionReports(page, limit);
+    const result = await sessionService.getAllSessionReports(page, limit, filters);
     res.status(200).json(result);
   } catch (error) {
     next(error);
