@@ -67,7 +67,10 @@ const allowedOrigins = [
   'http://localhost:4000',
   'http://localhost:5173',
   'https://cinemaclub-snowy.vercel.app',
-  'https://cinema-frontend-gamma.vercel.app'
+  'https://cinema-frontend-gamma.vercel.app',
+  'capacitor://localhost', // For iOS Capacitor apps
+  'http://localhost:8080', // Common mobile dev server port
+  'https://cinema-app', // Potential iOS app scheme
 ];
 
 // Middleware para CORS (funcionará tanto no Render quanto localmente)
@@ -79,8 +82,9 @@ app.use((req, res, next) => {
   console.log('Allowed origins:', allowedOrigins);
   
   // Permitir origens específicas
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
+  if (allowedOrigins.includes(origin) || 
+      (origin && allowedOrigins.some(allowed => origin.startsWith(allowed)))) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, X-XSRF-TOKEN');
@@ -89,10 +93,9 @@ app.use((req, res, next) => {
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
+    return res.sendStatus(200);
   }
-
+  
   next();
 });
 
