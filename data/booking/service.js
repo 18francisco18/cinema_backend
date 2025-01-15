@@ -193,7 +193,7 @@ function bookingService(bookingModel) {
       console.log("Total amount:", totalAmount);
 
       // Aplicar o promocode, se fornecido
-      if (booking.promocodes && booking.promocodes.length > 0) {
+      if (booking.promocode && booking.promocode.length > 0 && booking.promocode[0] !== '') {
         totalAmount = await promocodeService.applyPromocode(
           booking,
           totalAmount
@@ -558,7 +558,7 @@ function bookingService(bookingModel) {
       );
 
       // Aplicar promocode, se existir
-      if (booking.promocode) {
+      if (booking.promocode && booking.promocode.length > 0 && booking.promocode[0] !== '') {
         const promocode = await Promocode.findOne({ code: booking.promocode });
         if (!promocode) throw new ValidationError("Invalid promocode");
 
