@@ -68,6 +68,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://cinemaclub-snowy.vercel.app',
   'https://cinema-frontend-gamma.vercel.app',
+  'https://cinema-club-front.vercel.app',
   'capacitor://localhost', // For iOS Capacitor apps
   'http://localhost:8080', // Common mobile dev server port
   'https://cinema-app', // Potential iOS app scheme
